@@ -353,8 +353,10 @@ fields; add appropriate fixtures when validating those cases.
 
 ## 11. Open but nonblocking choices
 
-- Hosting domain: a subdomain of `kocolosk.net`; `photos.kocolosk.net` is the
-  current candidate, with the exact subdomain still to be confirmed.
+Hosting domain confirmed on 2026-10-22: **`photos.kocolosk.net`**.
+
+Remaining choices:
+
 - Site name, visual design, and exact route/CLI syntax.
 - Final photographer credit, rights text, and contact details (launch gate).
 - Metadata conflict precedence and timezone fallback details.
