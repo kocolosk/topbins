@@ -1,0 +1,33 @@
+{
+  "name": "topbins",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.15.0",
+    "npm": "11.12.1"
+  },
+  "scripts": {
+    "dev": "wrangler dev --local --ip 127.0.0.1",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "types:generate": "wrangler types",
+    "types:check": "wrangler types --check",
+    "typecheck": "tsc -p tsconfig.json && tsc -p cli/tsconfig.json",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "test": "vitest run",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "doctor": "node cli/main.ts doctor",
+    "cli": "node cli/main.ts",
+    "check": "npm run types:check && npm run typecheck && npm run lint && npm run format:check && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.2",
+    "@cloudflare/vitest-plugin": "1.4.6",
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12",
+    "wrangler": "4.151.3"
+  }
+}
