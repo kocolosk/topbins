@@ -23,7 +23,7 @@
     "check": "npm run types:check && npm run typecheck && npm run lint && npm run format:check && npm test && npm run build"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.2",
+    "@biomejs/biome": "2.6.3",
     "@cloudflare/vitest-plugin": "1.4.6",
     "@types/node": "24.19.2",
     "typescript": "5.9.3",
