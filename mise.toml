@@ -1,0 +1,19 @@
+[tools]
+node = "24.15.0"
+"conda:ffmpeg" = "8.1.2"
+"conda:exiftool" = "13.59"
+
+[env]
+WRANGLER_SEND_METRICS = "false"
+
+[tasks.setup]
+description = "Install locked JavaScript dependencies and initialize local D1"
+run = ["npm ci", "CI=true npm run db:migrate"]
+
+[tasks.dev]
+description = "Run the local Worker and static assets"
+run = "npm run dev"
+
+[tasks.check]
+description = "Run all offline scaffold checks"
+run = "npm run check"
