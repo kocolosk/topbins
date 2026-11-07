@@ -21,7 +21,8 @@ review approval, or passing checks alone do not authorize landing.
 
 The destination is `main` on GitHub at `kocolosk/topbins`, using `origin`.
 Inspect remotes before publication and confirm that `origin` still identifies
-that repository. Never publish through `local`, the user's checkout backlink.
+that repository. Also maintain a matching PR feature branch on `local`, the
+user's checkout backlink; it is not the GitHub publication destination.
 If the destination or requested scope is ambiguous, stop and ask.
 
 ## Preflight
@@ -111,8 +112,10 @@ Once `main` exists, do not use this exception again.
 2. Prepare a descriptive feature branch containing only the requested changes.
    Reuse an existing appropriate branch/PR rather than creating duplicates.
    Make any necessary commits with explicit messages after verification.
-3. Publish the branch to `origin` using a normal push, then create or update
-   its pull request targeting `main` in `kocolosk/topbins`. Check the installed
+3. Publish the same feature branch and commit to both `local` and `origin`
+   using normal, non-force pushes, following the local synchronization rules
+   below. Then create or update its pull request targeting `main` in
+   `kocolosk/topbins`. Check the installed
    CLI's supported flags before execution; do not assume every upstream
    subcommand is implemented by a local wrapper. Use explicit title/body text,
    respecting submission policy and templates, rather than an interactive editor.
@@ -134,6 +137,31 @@ Once `main` exists, do not use this exception again.
 
 Never force-push, disable checks, override protections, use administrative bypass,
 or merge a stale version whose required checks do not apply.
+
+## Local feature-branch synchronization
+
+- Inspect `local` before publishing and confirm that it is the expected source
+  repository. Stop if it is missing or points somewhere unexpected.
+- Each PR must have a same-named feature branch on `local` at the same commit
+  as its branch on `origin`. Use explicit branch refspecs; never push all refs,
+  tags, or a mirror of the repository.
+- Push the feature branch to `local` before publishing/updating it on `origin`.
+  After every PR-head update, synchronize both branches and verify their hashes
+  with `git ls-remote` before proceeding to merge.
+- Only create a missing branch or fast-forward an existing branch. If the local
+  branch has diverged, stop and report it; do not force-push or discard commits.
+- Do not update a branch checked out in the source repository or any of its
+  worktrees. If the requested branch is checked out, pause for the user rather
+  than changing checkout state or Git receive settings.
+- Keep the local feature branch after merge, even if GitHub deletes its copy.
+  After a squash merge it retains the final PR-head commit, not the squash
+  commit. Do not rewrite it to the destination commit.
+- This synchronization does not advance the user's checked-out `main` or modify
+  files in their primary checkout. Updating that checkout is a separate explicit
+  operation, not an implicit part of landing.
+- A push to one remote can succeed while the other fails. Report both states
+  precisely and retry only safe non-force updates; do not merge while required
+  feature-branch synchronization remains incomplete.
 
 ## Cloudflare previews
 
@@ -173,8 +201,9 @@ contribution requirements, or failed/unverifiable required checks.
 ## Completion
 
 Report the destination branch, resulting commit, PR URL when applicable, checks
-actually run, and any remaining limitations. Verify the remote destination,
-not merely the local branch. Do not claim success unless the requested changes
+actually run, the synchronized local feature branch, and any remaining
+limitations. Verify the remote destination, not merely the local branch.
+Do not claim success unless the requested changes
 are landed. On a blocker, explicitly state that they have not landed and
 identify the action needed to proceed.
 
