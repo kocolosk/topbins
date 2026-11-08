@@ -165,7 +165,12 @@ deployment and immutable-URL route probes passed, and the temporary
 `ci/builds-validation` Preview was removed. This used local Wrangler OAuth, not
 the stored Builds token.
 
-The build/deploy scripts must be published before
-Cloudflare can execute them. The first hosted build, stored build token's D1
-permissions, PR comment, Linux bootstrap, and branch-deletion cleanup still need
-end-to-end verification; local tests are not evidence of those hosted behaviors.
+The first hosted build failed because `mise run setup` auto-installed unrelated
+build-image tools, including an invalid Hugo version. Isolating configuration
+and exposing the bootstrapped mise binary on PATH resolved it. Hosted commit
+`b709654` passed GitHub CI and Workers Builds on 2026-11-08, confirming the Linux
+bootstrap, full checks, stored build token's D1 access, deployment and route probes.
+Cloudflare posted the branch and immutable deployment URLs on PR #14.
+Read-back confirmed `auto_build` and `auto_delete` are enabled for the branch.
+Actual native branch-deletion cleanup remains untested; the PR branch is still
+needed for review.
