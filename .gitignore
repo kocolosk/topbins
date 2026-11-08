@@ -10,3 +10,6 @@ coverage/
 wrangler.remote.jsonc
 examples/
 .DS_Store
+.topbins-state.json
+.topbins-state.json.lock
+.topbins-state.json.*.tmp

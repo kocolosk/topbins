@@ -37,8 +37,10 @@ The browsing hierarchy is **team → season → match**.
 - Teams have seasons; seasons contain match albums.
 - An album has a title, match date, cover, publication state, and visibility.
 - Albums contain photos and videos in a shared ordering.
-- Capture time supplies the initial ordering; ambiguous or missing timestamps
-  must be handled deterministically and reported during import.
+- Within an album, order by original camera/export filename lexicographically
+  (case-sensitive), including bursts with identical second-level timestamps.
+  Capture times are displayed but do not override filename order. Keep filenames
+  private; use stable media IDs as a deterministic tie-breaker/fallback.
 - Visitors can open an individual media item and share a stable link to it.
 - A photo's public link remains stable when its source is explicitly replaced.
 
@@ -54,8 +56,8 @@ The browsing hierarchy is **team → season → match**.
   download action.
 - Provide a simple contact/removal-request path.
 
-**Proposed defaults:** newest matches first within a season; chronological media
-ordering within an album; a justified photo grid; explicitly selected covers,
+**Proposed defaults:** newest matches first within a season; a justified photo
+grid; explicitly selected covers,
 falling back to the first photo. Visual design remains open.
 
 ## 3. Publication and visibility
@@ -128,7 +130,6 @@ Read metadata before sanitizing. Never modify the publisher's input files.
 
 - Original keyword strings from IPTC and XMP, including hierarchical keywords
   when present.
-- Capture timestamp and available timezone information for ordering.
 - Original filename and provenance needed for repeatable imports.
 - Extracted credit/rights fields needed for publication.
 
@@ -143,6 +144,10 @@ frontend payloads, public APIs, autocomplete, filenames, or downloadable files.
 
 Extract and normalize these fields where available:
 
+- Capture timestamp and available timezone offset: expose in gallery/API and
+  retain in downloadable JPEG metadata. Show the recorded local time and offset,
+  not the viewer's timezone. If the offset is missing, label the timezone unknown;
+  do not invent one. Filename ordering remains authoritative.
 - Creator/photographer: IPTC By-line, XMP Creator, EXIF Artist.
 - Copyright notice: IPTC Copyright Notice, XMP Rights, EXIF Copyright.
 - Usage terms: XMP Rights Usage Terms.
@@ -156,7 +161,8 @@ either. Treat metadata as untrusted text and validate public URLs.
 Sanitize a publishing copy before upload:
 
 - Remove GPS, keywords, identifying filenames, and unapproved metadata.
-- Preserve correct orientation, color appearance, and approved rights fields.
+- Preserve capture date/time, available offset and subsecond precision, correct
+  orientation, color appearance, and approved rights fields.
 - Prefer metadata-only operations that do not re-encode JPEG pixels.
 - Apply the same policy to download sources, not only display variants.
 - Do not remove provenance/Content Credentials casually; if encountered,
