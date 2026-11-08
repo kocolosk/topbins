@@ -250,9 +250,11 @@ Once the specific changes are approved:
    source downloads, browser video seeking, backup/export and SPEC acceptance
    checks before real publication. Approve credit, usage terms and contact.
 
-The current GitHub workflow has no deployment credentials or deploy step.
-Any future deployment workflow needs a separately approved environment,
-least-privilege secrets, migration strategy and release gate. GitHub Actions
+The PR preview pipeline is separately approved: see [pr-previews.md](pr-previews.md)
+for its dedicated parent Worker, shared staging bindings, Workers Builds setup,
+migration strategy and cleanup. GitHub CI remains credential-free. The Builds
+connection never deploys production. Any production
+deployment workflow still needs separate approval and a release gate. GitHub Actions
 must pass for the exact PR head before landing; repository inspection found
 Actions enabled and `main` unprotected. Changing branch protection needs
 separate approval.
