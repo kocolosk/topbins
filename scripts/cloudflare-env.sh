@@ -4,6 +4,7 @@
 # A scoped `mise install` is not enough: `mise run` and `mise exec` otherwise
 # auto-install those inherited tools too.
 project_root="$(pwd -P)"
+export PATH="$project_root/.wrangler/build-tools/mise/bin:$PATH"
 export MISE_CONFIG_DIR="$project_root/.wrangler/build-tools/mise-config"
 export MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG_DIR/config.toml"
 export MISE_SYSTEM_CONFIG_FILE="$MISE_CONFIG_DIR/system.toml"

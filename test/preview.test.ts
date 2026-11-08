@@ -25,7 +25,7 @@ describe("Cloudflare mise configuration isolation", () => {
     const project = join(root, "repo");
     const globalConfig = join(root, "config.toml");
     const systemConfig = join(root, "system.toml");
-    const mise = process.env.MISE_BIN || "mise";
+    const mise = "mise";
     const scope = resolve("scripts/cloudflare-env.sh");
     mkdirSync(project);
     writeFileSync(join(root, ".tool-versions"), "hugo extended_0.147.7\n");
