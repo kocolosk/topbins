@@ -1,5 +1,31 @@
 # Cloudflare foundation and launch gates
 
+## Current implementation status
+
+The photo-only slice is implemented and locally validated; it has **not** been
+deployed. The remote site described below still serves the approved scaffold.
+Historical scaffold observations below do not imply the new routes are live.
+
+See [publishing-api.md](publishing-api.md) for the implemented access/cache
+contract and [publishing-cli.md](publishing-cli.md) for local operation:
+
+- D1 catalog and private metadata tables, team-scoped seasons, public/unlisted
+  listing rules, and atomic album commits.
+- Local-only JPEG CLI, metadata sanitization, persistent IDs, explicit source
+  replacements, and private keyword preservation.
+- Bearer publisher authentication and Basic/Bearer draft preview, disabled when
+  no runtime `PUBLISH_TOKEN` is supplied. Production authentication review remains
+  required; the Access recommendation below has not been implemented.
+- Images binding input/transform validation and approved display presets.
+  Internal one-day variant caching is version/preset/format-specific and always
+  follows a current publication check. Browser dynamic responses stay no-store.
+- Exact JPEG downloads with ETag and HEAD. Video/range serving remains future
+  work.
+
+No remote configuration, entitlement, resource, DNS, migration, or deployment
+changes are included in this slice. Real Images fidelity and real-device
+validation remain launch gates. The CLI intentionally rejects remote endpoints.
+
 ## Initial read-only inspection
 
 Inspection from the supplied baseline found an active `kocolosk.net` zone in

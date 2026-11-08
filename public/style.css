@@ -1,14 +1,375 @@
 :root {
-  font-family: system-ui, sans-serif;
-  color-scheme: light dark;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  color: #233544;
+  background: #ffffff;
+  color-scheme: light;
+  --ink: #233544;
+  --blue: #315c78;
+  --mist: #edf2f5;
+  --gold: #cba64b;
+  --muted: #526675;
 }
 
+* {
+  box-sizing: border-box;
+}
 body {
   margin: 0;
-  padding: 2rem;
 }
-
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+button,
+.button {
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 5px;
+}
+.site-header,
+.site-footer,
 main {
-  max-width: 44rem;
-  margin: 10vh auto;
+  width: min(88rem, 100% - 4rem);
+  margin-inline: auto;
+}
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-block: 2rem;
+  border-bottom: 3px solid var(--ink);
+}
+.wordmark {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.09em;
+  text-decoration: none;
+}
+.wordmark-dot {
+  color: var(--blue);
+}
+.site-description {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+main {
+  min-height: 65vh;
+  padding-block: 2rem 5rem;
+}
+.page-heading {
+  margin-block: 2rem 3rem;
+  max-width: 65rem;
+}
+h1 {
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.055em;
+  margin: 0 0 1.2rem;
+  font-weight: 700;
+  text-wrap: balance;
+}
+h2 {
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+p {
+  line-height: 1.6;
+  max-width: 70ch;
+}
+.page-heading p {
+  color: var(--muted);
+}
+.page-heading .context {
+  margin-bottom: 0.65rem;
+  color: var(--blue);
+}
+.count {
+  margin-left: 1.5rem;
+}
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.breadcrumbs li + li::before {
+  content: "/";
+  margin-right: 0.75rem;
+}
+.directory {
+  list-style: none;
+  padding: 0;
+  max-width: 65rem;
+}
+.directory li {
+  border-bottom: 1px solid #c9d4dc;
+}
+.directory a {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.75rem 0;
+  text-decoration: none;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+.directory-action {
+  color: var(--blue);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+.directory a:hover,
+.match:where(:hover) h2 {
+  color: var(--blue);
+  text-decoration: underline;
+}
+.empty-state {
+  background: var(--mist);
+  padding: 2rem;
+  max-width: 45rem;
+}
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 3rem 1.5rem;
+}
+.match {
+  text-decoration: none;
+}
+.match img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.match-description {
+  padding-block: 1rem;
+}
+.match h2 {
+  margin-block: 0.4rem;
+  font-size: 1.6rem;
+}
+.match time,
+.match-description > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.cover-placeholder {
+  height: 12rem;
+  background: var(--mist);
+}
+.photo-grid {
+  columns: 3 18rem;
+  column-gap: 0.75rem;
+}
+.photo-grid figure {
+  break-inside: avoid;
+  margin: 0 0 0.75rem;
+}
+.photo-grid .capture-time {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0.8rem;
+}
+.photo-link {
+  display: block;
+}
+.photo-grid img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--mist);
+}
+.album-heading {
+  max-width: none;
+}
+.visibility-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.preview-notice {
+  background: #fff2c9;
+  color: var(--ink);
+  padding: 1rem 2rem;
+}
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid #c9d4dc;
+  padding-block: 1.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.site-footer p {
+  margin: 0;
+}
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 1rem;
+  padding: 1rem;
+  background: white;
+  z-index: 3;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.viewer-open {
+  overflow: hidden;
+}
+#viewer {
+  border: 0;
+  background: #14222d;
+  color: white;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+}
+#viewer::backdrop {
+  background: #14222d;
+}
+.viewer-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+}
+.viewer-toolbar button,
+.viewer-actions button {
+  color: inherit;
+  background: transparent;
+  border: 1px solid #8497a4;
+  padding: 0.6rem 1rem;
+  border-radius: 3px;
+}
+.viewer-toolbar button span {
+  margin-left: 0.75rem;
+}
+.viewer-stage {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  justify-items: center;
+  min-height: 10rem;
+}
+#viewer-image {
+  display: block;
+  max-width: 100%;
+  max-height: 73vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.viewer-step {
+  background: none;
+  border: 0;
+  color: white;
+  width: 3rem;
+  min-height: 4rem;
+  font-size: 2.5rem;
+}
+.viewer-details {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  align-items: start;
+}
+.rights {
+  font-size: 0.9rem;
+}
+.rights p {
+  margin: 0 0 0.4rem;
+}
+.viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+.button {
+  display: inline-block;
+  border: 1px solid transparent;
+  padding: 0.6rem 1rem;
+  background: var(--mist);
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: 3px;
+}
+.selected-photo img {
+  max-width: 100%;
+  height: auto;
+}
+@media (max-width: 42rem) {
+  .site-header,
+  .site-footer,
+  main {
+    width: calc(100% - 2rem);
+  }
+  .site-header {
+    padding-block: 1.25rem;
+  }
+  .site-description {
+    display: none;
+  }
+  .page-heading {
+    margin-block: 1rem 2rem;
+  }
+  .directory a {
+    font-size: 1.4rem;
+  }
+  .directory-action {
+    max-width: 5rem;
+    text-align: right;
+  }
+  .photo-grid {
+    columns: 2;
+    gap: 0.4rem;
+  }
+  .photo-grid figure {
+    margin-bottom: 0.4rem;
+  }
+  .viewer-details {
+    flex-direction: column;
+    padding: 1rem;
+  }
+  .viewer-stage {
+    grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+  }
+  .viewer-step {
+    width: 2.25rem;
+  }
+  #viewer-image {
+    max-height: 65vh;
+  }
 }

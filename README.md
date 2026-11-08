@@ -1,9 +1,11 @@
 # topbins
 
 Cloudflare-native sports photo/video gallery. [SPEC.md](SPEC.md) is the product
-and architecture baseline. This repository currently contains **scaffolding only**:
-no gallery, media ingestion, sanitization, authentication, preview, or publishing.
-No private sample media are included or required.
+and architecture baseline. The first **local, photo-only publishing slice** is
+implemented: folder import, JPEG sanitization, a D1 catalog, authenticated draft
+preview, public/unlisted galleries, managed display sizes, and source downloads.
+Video and production launch work remain. No private sample media are included
+or required.
 
 ## Quick start
 
@@ -25,8 +27,9 @@ mise run dev
 ```
 
 Open http://127.0.0.1:8787. `GET /api/health` returns `{"status":"ok"}`;
-`/` is a placeholder page. Everything else except `/style.css` returns 404.
-Stop development with Ctrl+C. No Cloudflare login or credentials are needed.
+`/` shows public teams, or an empty state until a match is published locally.
+Stop development with Ctrl+C. No Cloudflare login or credentials are needed for
+setup/checks or browsing. Publishing and draft preview require a local token.
 Installation downloads public tool packages; the app, tests, D1 and R2 run locally.
 Do not use `wrangler dev --remote` or set bindings to `remote: true` casually.
 The explicit tool list scopes installation to this project, avoiding attempts
@@ -59,7 +62,7 @@ Do not rely on a globally installed Wrangler or media tool.
 | `mise exec -- npm run format:check` | Check formatting without writes |
 | `mise exec -- npm run build` | Wrangler bundle/static-assets dry run; **does not deploy** |
 | `mise exec -- npm run doctor` | Execute ExifTool, FFmpeg and FFprobe version probes |
-| `mise exec -- npm run cli -- --help` | Publisher CLI scaffold help |
+| `mise exec -- npm run cli -- --help` | Publisher CLI usage |
 | `mise run check` | Generated types, typechecking, lint, format, tests, dry-run build |
 
 `doctor` exits nonzero for missing, broken or timed-out tools with a mise recovery
@@ -69,24 +72,43 @@ Never point tests at private exports to make checks pass.
 
 Local state lives in ignored `.wrangler/state/`; Vitest uses isolated ephemeral
 storage and does not reuse that development state. The baseline migration is
-intentionally a no-op, recorded by Wrangler's migration ledger. Add forward-only
-numbered migrations when implementing the catalog; do not edit applied migrations.
-The product schema has deliberately not been invented as part of tooling.
+intentionally a no-op; subsequent migrations add the catalog and team-scoped
+seasons. Add forward-only numbered migrations; do not edit applied migrations.
+
+## Import and preview a match locally
+
+Follow [the publishing CLI guide](docs/publishing-cli.md) for the JSON manifest,
+credential setup, metadata/profile policy, and retry/replacement behavior:
+
+```sh
+mise exec -- npm run cli -- import ./exports --manifest ./match.json --endpoint http://127.0.0.1:8787
+```
+
+The first import creates a draft. Open the returned `/preview/...` URL and use
+username `publisher` with your local publisher token as the password.
+Add `--publish` to expose the album in your **local** gallery. Re-importing a
+published album without that flag preserves its publication state. The CLI
+rejects non-loopback endpoints in this slice.
 
 ## Stack and layout
 
-- `src/worker.ts`: ES-module TypeScript Worker, minimal liveness endpoint and
-  explicit static asset allowlist. All responses currently use no-store and
-  noindex. No open R2 proxy, SPA fallback, or unfinished publisher endpoint.
-- `public/`: deployable static placeholder. Wrangler bundles the Worker and
-  uploads assets, so no second bundler or framework is necessary yet.
+- `src/worker.ts`: routes to explicit catalog, publisher, media, and site handlers.
+  Catalog reads apply visibility and media projection in one database statement.
+  No open R2 proxy or SPA fallback.
+- `src/pages.ts` / `src/site.ts`: server-rendered team/season/match pages and
+  authenticated preview. All pages remain no-store/noindex during this local
+  implementation phase.
+- `public/`: CSS and progressive photo-viewer JavaScript. Pages and source
+  downloads work without JavaScript; the viewer adds modal, touch, keyboard, and
+  individual-link behavior. No additional frontend framework or build tool.
 - `cli/`: Node 24 native TypeScript entry point, isolated from Worker types.
-  Future local-folder publishing lives here, not in the browser.
-- `migrations/`: D1 migrations; future team → season → match catalog and separate
+  ExifTool sanitizes temporary copies without modifying source exports.
+- `migrations/`: D1 migrations; team → season → match catalog and separate
   publisher-only metadata tables.
 - `test/`: Vitest using Cloudflare's current `@cloudflare/vitest-plugin` in
-  workerd, plus Node-based CLI diagnostics tests. D1 migrations, R2 round-trip,
-  static assets, route denial, headers and HEAD behavior are exercised.
+  workerd, plus Node-based CLI and rendering tests. Synthetic JPEG tests execute
+  the pinned media tools and verify pixel equality, metadata removal, private
+  keyword retention, profile handling, stable IDs, retry, and replacement.
 - `wrangler.jsonc`: local-safe binding source of truth. `worker-configuration.d.ts`
   is generated and committed, never manually edited.
 - `mise.toml` / `mise.lock`: exact Node/media-tool versions and resolved
@@ -122,16 +144,18 @@ The ignored machine-local remote config is separate from the local dev config;
 see the remote setup record for identifiers and verification. Local setup/checks
 still require no Cloudflare credentials.
 
-Still to implement under the spec:
+Remaining work under the spec:
 
-- Catalog, public/unlisted visibility and non-enumeration; authenticated draft
-  preview and publisher operations. No viewer sign-in.
-- CLI manifest, repeatable/resumable uploads, private keyword extraction,
-  sanitization and explicit stable-ID source replacement.
-- Approved display presets with format negotiation and versioned cache keys;
-  exact sanitized JPEG downloads. No pregenerated photo variants.
+- Production publisher authentication review, remote publishing transport,
+  launch policies, approved deployment, and real managed Images validation.
+- Approval of additional embedded ICC profiles before importing exports that
+  contain them. Unknown profiles fail closed rather than leak embedded text or
+  change colors by assigning another profile.
 - Direct-play H.264/AAC MP4s, local probe/remux/poster processing preserving
   audio, and streamed range-aware R2 serving. No server transcoder or mute flag.
-- Actual gallery UI, rights/contact approval, recovery/export and launch checks.
+- Explicit deletion/unpublishing UX, complete catalog/asset backup and recovery,
+  rights/contact approval, and real-device launch checks.
 
-The SPEC acceptance checklist is **not** satisfied by scaffold checks.
+The authenticated API exports each album's private metadata; a full-site export
+and recovery command is not implemented. See [the API contract](docs/publishing-api.md).
+The full SPEC acceptance checklist is **not** satisfied by these local checks.
