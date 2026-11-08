@@ -19,6 +19,7 @@ tar -xzf "$tools/mise.tar.gz" -C "$tools"
 mise="$tools/mise/bin/mise"
 
 export CI=true WRANGLER_SEND_METRICS=false
+. ./scripts/cloudflare-env.sh
 "$mise" trust mise.toml
 "$mise" install --locked node conda:ffmpeg conda:exiftool
 "$mise" run setup

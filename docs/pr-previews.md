@@ -77,6 +77,14 @@ binary in a new shell. Dependency auto-install is disabled in Builds; mise
 installs the locked Node, FFmpeg and ExifTool versions before `mise run setup`.
 The image's ambient media tools and npm version are not used.
 
+Both command processes source `scripts/cloudflare-env.sh` before invoking mise.
+It points global/system configuration at the private build-tools config directory
+and stops ancestor discovery above the repository. This prevents `mise run` and
+`mise exec` from auto-installing unrelated build-image tools, such as Cloudflare's
+invalid `hugo@extended_0.147.7` default. Listing explicit tools on `mise install`
+alone does not isolate subsequent task/exec commands. The shared environment
+script does not change Cloudflare's global configuration or other projects.
+
 ## Checks and deployment
 
 GitHub Actions remains read-only, credential-free CI. It runs in parallel with

@@ -1,4 +1,14 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   pendingMigrations,
@@ -8,6 +18,62 @@ import { previewUrls } from "../scripts/preview-output.ts";
 
 const local = JSON.parse(readFileSync("wrangler.jsonc", "utf8"));
 const preview = JSON.parse(readFileSync("wrangler.preview.jsonc", "utf8"));
+
+describe("Cloudflare mise configuration isolation", () => {
+  it("excludes global, system and ancestor tools for task and exec commands", () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "topbins-mise-")));
+    const project = join(root, "repo");
+    const globalConfig = join(root, "config.toml");
+    const systemConfig = join(root, "system.toml");
+    const mise = process.env.MISE_BIN || "mise";
+    const scope = resolve("scripts/cloudflare-env.sh");
+    mkdirSync(project);
+    writeFileSync(join(root, ".tool-versions"), "hugo extended_0.147.7\n");
+    writeFileSync(globalConfig, '[tools]\nruby = "3.4.11"\n');
+    writeFileSync(systemConfig, '[tools]\ngo = "1.27.3"\n');
+    writeFileSync(
+      join(project, "mise.toml"),
+      '[tools]\nnode = "24.15.0"\n[tasks.probe]\nrun = "node --version"\n',
+    );
+    const env = {
+      ...process.env,
+      MISE_CONFIG_DIR: root,
+      MISE_GLOBAL_CONFIG_FILE: globalConfig,
+      MISE_SYSTEM_CONFIG_FILE: systemConfig,
+      MISE_CEILING_PATHS: dirname(root),
+      MISE_TRUSTED_CONFIG_PATHS: root,
+    };
+    const options = { cwd: project, env, encoding: "utf8" as const };
+    try {
+      // Prove the fixture models the inherited build-image configuration.
+      const inherited = JSON.parse(
+        execFileSync(mise, ["config", "ls", "--json"], options),
+      );
+      expect(
+        inherited.some((config: { tools: string[] }) =>
+          config.tools.includes("hugo"),
+        ),
+      ).toBe(true);
+      const scoped = (args: string[]) =>
+        execFileSync(
+          "sh",
+          ["-c", '. "$1"; shift; exec "$@"', "scope", scope, mise, ...args],
+          options,
+        );
+      const configs = JSON.parse(scoped(["config", "ls", "--json"]));
+      expect(configs).toHaveLength(1);
+      expect(configs[0].path).toBe(join(project, "mise.toml"));
+      expect(configs[0].tools).toEqual(["node"]);
+      // Neither command may attempt to install the deliberately broken Hugo.
+      expect(scoped(["run", "probe"]).trim()).toBe("v24.15.0");
+      expect(scoped(["exec", "--", "node", "--version"]).trim()).toBe(
+        "v24.15.0",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("PR preview deployment boundary", () => {
   it("keeps local development credential-free and remote bindings disabled", () => {
