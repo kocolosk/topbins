@@ -33,11 +33,39 @@ function command(tool: string, args: string[]) {
 }
 await mkdir(dir, { recursive: true, mode: 0o700 });
 const lockPath = join(dir, "run.lock");
-const lock = await open(lockPath, "wx", 0o600).catch(() => {
-  throw new Error(
-    "Demo already running or stale .wrangler/demo/run.lock. Remove it only after confirming no demo is active.",
-  );
-});
+// Record the owner PID so a lock left by an interrupted or killed run is
+// reclaimed instead of blocking the next demo.
+function running(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+async function acquireLock() {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const handle = await open(lockPath, "wx", 0o600);
+      await handle.writeFile(String(process.pid));
+      return handle;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const owner = Number(await readFile(lockPath, "utf8").catch(() => ""));
+      if (
+        attempt ||
+        !Number.isSafeInteger(owner) ||
+        owner <= 0 ||
+        running(owner)
+      )
+        throw new Error(
+          "Demo already running or stale .wrangler/demo/run.lock. Remove it only after confirming no demo is active.",
+        );
+      await rm(lockPath, { force: true });
+    }
+  }
+}
+const lock = await acquireLock();
 try {
   const portCheck = createServer();
   await new Promise<void>((resolve, reject) => {

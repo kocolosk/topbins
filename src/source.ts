@@ -44,10 +44,11 @@ export async function serveSource(
     partial = false;
   let range = request.method === "HEAD" ? null : request.headers.get("Range");
   const ifRange = request.headers.get("If-Range");
+  // Unlike If-Modified-Since, an If-Range date must match exactly (RFC 9110).
   if (
     ifRange &&
     ifRange !== etag &&
-    !(Date.parse(ifRange) >= Date.parse(modified))
+    Date.parse(ifRange) !== Date.parse(modified)
   )
     range = null;
   if (range) {

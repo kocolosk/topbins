@@ -163,13 +163,24 @@ describe("video transport and visibility", () => {
     expect(
       (await call(path, { headers: { "If-None-Match": tag } })).status,
     ).toBe(304);
-    expect(
-      (
-        await call(path, {
-          headers: { Range: "bytes=0-1", "If-Range": '"stale"' },
-        })
-      ).status,
-    ).toBe(200);
+    const modified = full.headers.get("Last-Modified") ?? "";
+    const shifted = (seconds: number) =>
+      new Date(Date.parse(modified) + seconds * 1000).toUTCString();
+    for (const [validator, status] of [
+      [tag, 206],
+      [modified, 206],
+      ['"stale"', 200],
+      [shifted(-60), 200],
+      [shifted(60), 200],
+    ] as const) {
+      const result = await call(path, {
+        headers: { Range: "bytes=0-1", "If-Range": validator },
+      });
+      expect(result.status).toBe(status);
+      expect((await result.arrayBuffer()).byteLength).toBe(
+        status === 206 ? 2 : bytes.length,
+      );
+    }
     const head = await call(path, {
       method: "HEAD",
       headers: { Range: "bytes=0-1" },
