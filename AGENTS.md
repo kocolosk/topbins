@@ -15,6 +15,10 @@
 - Regenerate `worker-configuration.d.ts` with `npm run types:generate` after
   Wrangler config changes. Add forward-only D1 migrations; never edit an applied
   migration. Keep Node CLI code and Worker code in their separate type environments.
-- Changes to tooling should keep local and CI commands aligned. The existing
-  `.agents/skills/land/SKILL.md` describes the user-requested landing workflow;
-  implementation or passing checks does not authorize pushing or merging.
+- Changes to tooling should keep local and CI commands aligned.
+- Landing is automatic for finished changes: follow
+  `.agents/skills/land/SKILL.md` to push a branch, open a PR, handle failing
+  checks and review comments, and merge once checks pass and threads are
+  resolved (for changes with a meaningful preview, ask the user to try it
+  first). This covers code only. Production deploys, remote migrations,
+  Cloudflare/GitHub settings, and publishing media still need explicit approval.
