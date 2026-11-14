@@ -1,6 +1,14 @@
 import { response } from "./http";
 import { serveSource } from "./source";
 
+// Explicit quality: the binding's default WebP output was lossless (several MB).
+// Tuned on real exports (SSIM and 2x crops vs. the Lanczos-resized source).
+const quality = {
+  "image/jpeg": 82,
+  "image/webp": 80,
+  "image/avif": 65,
+} as const;
+
 export async function serveMedia(
   request: Request,
   env: Env,
@@ -49,11 +57,14 @@ export async function serveMedia(
       const quality = params.find((param) => param.trim().startsWith("q="));
       return quality === undefined || Number(quality.trim().slice(2)) > 0;
     });
-  const format = accepts("image/avif")
-    ? "image/avif"
-    : accepts("image/webp")
-      ? "image/webp"
-      : "image/jpeg";
+  // AVIF output is limited to 1,200 px per side, so the 2560 px viewer preset
+  // can only ever fall back to WebP; negotiate WebP for it up front.
+  const format =
+    accepts("image/avif") && match[3] === "grid"
+      ? "image/avif"
+      : accepts("image/avif") || accepts("image/webp")
+        ? "image/webp"
+        : "image/jpeg";
   const cacheUrl = new URL(request.url);
   cacheUrl.pathname = `/__image-cache/${match[1]}/${match[2]}/${match[3]}/${format.slice(6)}`;
   cacheUrl.search = "";
@@ -84,9 +95,15 @@ export async function serveMedia(
     const transformed = (
       await env.IMAGES.input(object.body)
         .transform({ width: size, height: size, fit: "scale-down" })
-        .output({ format })
+        .output({
+          format,
+          quality: quality[format],
+        })
     ).response();
     if (!transformed.ok) return response("Image transformation failed", 502);
+    // Label by what was actually produced, never by what was requested.
+    const actual = transformed.headers.get("Content-Type")?.split(";")[0];
+    if (actual !== format) return response("Image transformation failed", 502);
     const result = response(
       request.method === "HEAD" ? null : transformed.body,
       200,

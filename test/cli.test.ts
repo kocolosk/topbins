@@ -121,6 +121,14 @@ it("imports a synthetic JPEG without changing pixels or exposing keywords", asyn
       "-GPSLatitudeRef=N",
       source,
     ]);
+    // Lightroom exports carry a fixed-size Adobe APP14 marker (DCT version,
+    // flags, YCbCr transform); exiftool cannot write it, so splice the bytes.
+    const adobe = Buffer.from("ffee000e41646f626500640000000001", "hex");
+    const withAdobe = await readFile(source);
+    await writeFile(
+      source,
+      Buffer.concat([withAdobe.subarray(0, 2), adobe, withAdobe.subarray(2)]),
+    );
     const original = await readFile(source);
     const manifest = join(dir, "manifest.json");
     await writeFile(

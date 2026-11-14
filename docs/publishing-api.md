@@ -82,7 +82,8 @@ noindex during this implementation phase, including public galleries.
 `/media/:mediaId/:sourceHash/grid|viewer|download` resolves the current catalog
 reference and publication state, never an arbitrary bucket key. Presets preserve
 aspect ratio without upscaling. AVIF/WebP are selected only when explicitly
-accepted; otherwise JPEG. The internal edge cache is keyed by media ID, source
+accepted; otherwise JPEG. Explicit qualities: JPEG 82, WebP 80, AVIF 65. AVIF is
+limited to 1,200 px, so only the grid preset is AVIF; the viewer negotiates WebP. The internal edge cache is keyed by media ID, source
 version, preset, and format, with a one-day TTL. Every cache hit still requires a
 fresh publication check; draft previews bypass the cache. Browser responses
 remain no-store. Video `grid`/`viewer` image URLs use the current poster hash,
