@@ -558,7 +558,7 @@ async function performImport(
         throw new Error(`${name}: sanitized file must be under 20 MB`);
       const verified = probe(output);
       const allowed =
-        /^(SourceFile|ExifTool:|System:|File:|JPEG:|JFIF:|Composite:|ICC_Profile:|ICC-header:|IFD0:Orientation$|IFD0:YCbCrPositioning$|ExifIFD:(ColorSpace|ExifVersion|ComponentsConfiguration|DateTimeOriginal|OffsetTimeOriginal|SubSecTimeOriginal)$|XMP-x:XMPToolkit$|XMP-dc:Creator$|XMP-dc:Rights$|XMP-xmpRights:UsageTerms$|XMP-xmpRights:WebStatement$)/;
+        /^(SourceFile|ExifTool:|System:|File:|JPEG:|JFIF:|Composite:|ICC_Profile:|ICC-header:|ICC-view:|ICC-meas:|Adobe:(DCTEncodeVersion|APP14Flags0|APP14Flags1|ColorTransform)$|IFD0:Orientation$|IFD0:YCbCrPositioning$|ExifIFD:(ColorSpace|ExifVersion|ComponentsConfiguration|DateTimeOriginal|OffsetTimeOriginal|SubSecTimeOriginal)$|XMP-x:XMPToolkit$|XMP-dc:Creator$|XMP-dc:Rights$|XMP-xmpRights:UsageTerms$|XMP-xmpRights:WebStatement$)/;
       const unexpected = Object.keys(verified).filter(
         (key) => !allowed.test(key),
       );

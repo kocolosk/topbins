@@ -33,6 +33,40 @@ Video request size is capped below 100,000,000 bytes and requires Content-Length
 larger camera files need a web export. Verify actual account/zone request limits
 before enabling remote publishing. This is not a multipart upload protocol.
 
+## Real Images validation — 2026-11-13
+
+Run with the user's approval on eight real exports (kept in the ignored
+`examples/`, copied to a temporary directory that was deleted afterwards) plus two
+synthetic noise JPEGs. Only the `IMAGES` binding was remote (`wrangler dev` with
+`images.remote: true`; D1 and R2 were local throwaway state), so photo bytes went to
+Cloudflare for transformation but nothing was stored remotely. Nothing was published.
+
+Inputs: 3072×2048, 5267×3512 and 6684×4456 exports (1.2–7.9 MB) and synthetic
+6960×4640 (32 MP) files of 14.5 MB and 19.2 MB. All imported (upload runs both
+presets through the real service), transformed in roughly 0.3–2 s uncached, and
+served identical-to-hash downloads. Results:
+
+- Grid (640) and viewer (2560) outputs preserve aspect ratio, never upscale, and
+  show no color shift (mean color within ±3/255 of the resized source across JPEG,
+  WebP and AVIF; side-by-side crops indistinguishable apart from slightly softer AVIF).
+- **Default WebP output was lossless** (several MB per viewer image). Quality is now
+  explicit: JPEG 82, WebP 80, AVIF 65 (grid 36–41 KB AVIF, 57 KB WebP, 61 KB JPEG;
+  viewer ~515 KB WebP vs ~680 KB JPEG).
+- **AVIF is limited to 1,200 px** per side, so the 2560 viewer cannot be AVIF. A viewer
+  AVIF request used to return WebP bytes labeled `image/avif`; the Worker now
+  negotiates WebP for the viewer and refuses to serve a body whose type differs from
+  its label. AVIF is served for the grid only.
+- Downloads carry no GPS, keywords, camera/lens/serial, software or XMP editing
+  data; capture time, offset and subseconds are kept; the public JSON has no
+  filenames or keywords; the private export retains IPTC/XMP keywords.
+- Real exports revealed two importer gaps, fixed: the embedded HP "sRGB IEC61966-2.1"
+  profile needed approval, and its `ICC-view`/`ICC-meas` sub-groups and a fixed-size
+  Adobe APP14 marker tripped the sanitization verifier.
+
+Not covered: rotated (non-"Horizontal") EXIF orientation (all samples were
+landscape), HDR/wide-gamut sources, billing, behavior of the deployed production
+Worker's internal cache, and real iOS/Android browsers.
+
 ## Initial read-only inspection
 
 Inspection from the supplied baseline found an active `kocolosk.net` zone in

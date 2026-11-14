@@ -124,10 +124,11 @@ temporary directory.
 
 ICC profiles can themselves contain identifying text. The importer preserves
 only byte-for-byte approved profiles from `cli/color-profiles.ts`, verified by
-SHA-256; unknown profiles stop before any upload. The initial approved profile
-is the public CC0 compact sRGB profile pinned in that file. This is **not** an
-assumption that Lightroom exports use the same profile. Additional Lightroom
-profile fingerprints require privacy/color review before approval. Never assign
+SHA-256; unknown profiles stop before any upload. Approved profiles are the
+public CC0 compact sRGB profile and the HP "sRGB IEC61966-2.1" profile that the
+publisher's Lightroom exports embed (its tags were reviewed; see the comment in
+that file). Any other profile fingerprint requires privacy/color review before
+approval. Never assign
 a different profile merely to bypass the check: that can change color appearance.
 Tests include an approved profile and the same color-transform data with changed
 descriptive text, which is rejected. JPEGs with no ICC continue under the

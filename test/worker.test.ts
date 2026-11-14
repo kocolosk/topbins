@@ -417,6 +417,14 @@ describe("publisher and visibility", () => {
     );
     expect(cached.status).toBe(200);
     expect(await cached.arrayBuffer()).toEqual(imageBytes);
+    // AVIF output is capped at 1,200 px, so the 2560 px viewer negotiates WebP
+    // and is labeled by what was actually produced.
+    const viewer = await call(`/media/${imageId}/${digest}/viewer`, {
+      headers: { Accept: "image/avif,image/webp" },
+    });
+    expect(viewer.status).toBe(200);
+    expect(viewer.headers.get("Content-Type")).toBe("image/webp");
+    expect(viewer.headers.get("Vary")).toBe("Accept");
     expect((await write("draft")).status).toBe(200);
     expect((await call(imageUrl)).status).toBe(404);
   });
