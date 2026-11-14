@@ -1,4 +1,5 @@
 import { json, readLimitedBody, response } from "./http";
+import { uploadVideo } from "./video-upload";
 
 type PublisherEnv = Env & { PUBLISH_TOKEN?: string };
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -41,6 +42,9 @@ function validMedia(x: unknown): x is Obj {
       "rightsUrl",
       "privateMetadata",
       "replace",
+      "kind",
+      "duration",
+      "posterSha256",
     ])
   )
     return false;
@@ -82,6 +86,19 @@ function validMedia(x: unknown): x is Obj {
     (x.replace !== undefined && typeof x.replace !== "boolean")
   )
     return false;
+  if (x.kind !== undefined && x.kind !== "photo" && x.kind !== "video")
+    return false;
+  if (x.kind === "video") {
+    if (
+      typeof x.posterSha256 !== "string" ||
+      !hash.test(x.posterSha256) ||
+      typeof x.duration !== "number" ||
+      !Number.isFinite(x.duration) ||
+      x.duration <= 0 ||
+      x.duration > 86400
+    )
+      return false;
+  } else if (x.duration != null || x.posterSha256 != null) return false;
   if (x.rightsUrl !== null) {
     try {
       if (
@@ -115,10 +132,16 @@ export async function publisher(
   if (!authorized(request, env)) return response("Unauthorized", 401);
   const asset = /^\/api\/publisher\/assets\/([0-9a-f]{64})$/.exec(path);
   if (asset) {
-    const key = `sources/${asset[1]}.jpg`;
+    const video = new URL(request.url).searchParams.get("type") === "video/mp4";
+    const key = `sources/${asset[1]}.${video ? "mp4" : "jpg"}`;
     if (request.method === "HEAD" || request.method === "GET")
       return (await env.MEDIA.head(key)) ? response(null) : response(null, 404);
     if (request.method !== "PUT") return response("Method not allowed", 405);
+    if (video) {
+      if (request.headers.get("Content-Type") !== "video/mp4")
+        return response("Expected video/mp4", 400);
+      return uploadVideo(request, env, asset[1] ?? "");
+    }
     if (request.headers.get("Content-Type")?.toLowerCase() !== "image/jpeg")
       return response("Expected image/jpeg", 400);
     if (Number(request.headers.get("Content-Length")) >= limit)
@@ -212,6 +235,9 @@ export async function publisher(
         usage_terms: string | null;
         rights_url: string | null;
         metadata: string;
+        kind: "photo" | "video";
+        duration: number | null;
+        poster_sha256: string | null;
       }>();
     return json({
       id,
@@ -228,6 +254,9 @@ export async function publisher(
         sha256: m.source_sha256,
         width: m.width,
         height: m.height,
+        kind: m.kind,
+        duration: m.duration,
+        posterSha256: m.poster_sha256,
         captureTime: m.capture_time,
         credit: m.credit,
         copyright: m.copyright,
@@ -298,7 +327,9 @@ export async function publisher(
   )
     return response("Identity conflict", 409);
   for (const m of items) {
-    const source = await env.MEDIA.head(`sources/${m.sha256}.jpg`);
+    const source = await env.MEDIA.head(
+      `sources/${m.sha256}.${m.kind === "video" ? "mp4" : "jpg"}`,
+    );
     if (!source) return response("Missing source", 409);
     const width = Number(source.customMetadata?.width);
     const height = Number(source.customMetadata?.height);
@@ -311,6 +342,13 @@ export async function publisher(
       )
     )
       return response("Source dimensions do not match validated asset", 409);
+    if (m.kind === "video") {
+      if (Number(source.customMetadata?.duration) !== m.duration)
+        return response("Video duration does not match source", 409);
+      const poster = await env.MEDIA.head(`sources/${m.posterSha256}.jpg`);
+      if (!poster?.customMetadata?.width)
+        return response("Missing validated video poster", 409);
+    }
     const existing = await env.DB.prepare(
       "SELECT album_id, source_sha256 FROM media WHERE id=?",
     )
@@ -371,8 +409,8 @@ export async function publisher(
       ),
     );
     statements.push(
-      env.DB.prepare(`INSERT INTO media(id,album_id,source_sha256,width,height,capture_time,credit,copyright,usage_terms,rights_url) VALUES(?,?,?,?,?,?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET source_sha256=excluded.source_sha256,width=excluded.width,height=excluded.height,capture_time=excluded.capture_time,credit=excluded.credit,copyright=excluded.copyright,usage_terms=excluded.usage_terms,rights_url=excluded.rights_url
+      env.DB.prepare(`INSERT INTO media(id,album_id,source_sha256,width,height,capture_time,credit,copyright,usage_terms,rights_url,kind,duration,poster_sha256) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET source_sha256=excluded.source_sha256,width=excluded.width,height=excluded.height,capture_time=excluded.capture_time,credit=excluded.credit,copyright=excluded.copyright,usage_terms=excluded.usage_terms,rights_url=excluded.rights_url,kind=excluded.kind,duration=excluded.duration,poster_sha256=excluded.poster_sha256
       WHERE album_id=excluded.album_id AND (source_sha256=excluded.source_sha256 OR ?=1)`).bind(
         m.id,
         id,
@@ -386,6 +424,9 @@ export async function publisher(
         m.copyright,
         m.usageTerms,
         m.rightsUrl,
+        m.kind ?? "photo",
+        m.duration ?? null,
+        m.posterSha256 ?? null,
         m.replace === true ? 1 : 0,
       ),
     );

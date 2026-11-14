@@ -183,6 +183,17 @@ p {
 }
 .photo-link {
   display: block;
+  position: relative;
+}
+.video-badge {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  background: var(--ink);
+  color: white;
+  padding: 0.3rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.9rem;
 }
 .photo-grid img {
   display: block;
@@ -289,6 +300,18 @@ p {
   width: auto;
   height: auto;
   object-fit: contain;
+}
+#viewer-video {
+  max-width: 100%;
+  max-height: 73vh;
+}
+#viewer-image[hidden],
+#viewer-video[hidden] {
+  display: none;
+}
+.selected-photo video {
+  max-width: 100%;
+  height: auto;
 }
 .viewer-step {
   background: none;

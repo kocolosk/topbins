@@ -14,6 +14,15 @@ export interface Season {
 export type Photo = MediaDTO;
 export type Album = AlbumDTO;
 
+function mediaCount(album: Album): string {
+  return `${album.media.length} ${album.media.some((item) => item.kind === "video") ? "items" : "photos"}`;
+}
+
+function duration(seconds: number | null): string {
+  const total = Math.max(0, Math.round(seconds ?? 0));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
     return (
@@ -84,7 +93,7 @@ export function seasonPage(
         const cover =
           album.media.find((photo) => photo.id === album.coverMediaId) ??
           album.media[0];
-        return `<a class="match" href="/albums/${segment(album.id)}">${cover ? `<img src="${escapeHtml(cover.gridUrl)}" width="${cover.width}" height="${cover.height}" alt="" loading="lazy">` : '<div class="cover-placeholder" aria-hidden="true"></div>'}<div class="match-description"><time datetime="${escapeHtml(album.date)}">${escapeHtml(album.date)}</time><h2>${escapeHtml(album.title)}</h2><span>${album.media.length} photos</span></div></a>`;
+        return `<a class="match" href="/albums/${segment(album.id)}">${cover ? `<img src="${escapeHtml(cover.gridUrl)}" width="${cover.width}" height="${cover.height}" alt="" loading="lazy">` : '<div class="cover-placeholder" aria-hidden="true"></div>'}<div class="match-description"><time datetime="${escapeHtml(album.date)}">${escapeHtml(album.date)}</time><h2>${escapeHtml(album.title)}</h2><span>${mediaCount(album)}</span></div></a>`;
       })
       .join("")}</div>`,
   );
@@ -106,7 +115,9 @@ function photoTime(photo: Photo): string {
 function rights(photo: Photo): string {
   return [
     photoTime(photo),
-    photo.credit ? `<p>Photo by ${escapeHtml(photo.credit)}</p>` : "",
+    photo.credit
+      ? `<p>${photo.kind === "video" ? "Video" : "Photo"} by ${escapeHtml(photo.credit)}</p>`
+      : "",
     photo.copyright ? `<p>${escapeHtml(photo.copyright)}</p>` : "",
     photo.usageTerms ? `<p>${escapeHtml(photo.usageTerms)}</p>` : "",
     photo.rightsUrl && /^https?:\/\//i.test(photo.rightsUrl)
@@ -134,15 +145,15 @@ export function albumPage(album: Album, url: URL, preview = false): string {
             },
           ])
     }
-<div class="page-heading album-heading"><div><p class="context">${escapeHtml(album.teamTitle)} / ${escapeHtml(album.seasonTitle)}</p><h1>${escapeHtml(album.title)}</h1><p><time datetime="${escapeHtml(album.date)}">${escapeHtml(album.date)}</time><span class="count">${album.media.length} photos</span></p></div>${album.visibility === "unlisted" ? '<span class="visibility-note">Unlisted album · Anyone with this link can view and share it.</span>' : ""}</div>
-${chosen ? `<noscript><section class="selected-photo"><img src="${escapeHtml(chosen.viewerUrl)}" width="${chosen.width}" height="${chosen.height}" alt="Selected match photo"><div class="rights">${rights(chosen)}</div><a class="button" href="${escapeHtml(chosen.downloadUrl)}" download>Download photo</a><p><a href="${escapeHtml(url.pathname)}">Back to all photos</a></p></section></noscript>` : ""}
+<div class="page-heading album-heading"><div><p class="context">${escapeHtml(album.teamTitle)} / ${escapeHtml(album.seasonTitle)}</p><h1>${escapeHtml(album.title)}</h1><p><time datetime="${escapeHtml(album.date)}">${escapeHtml(album.date)}</time><span class="count">${mediaCount(album)}</span></p></div>${album.visibility === "unlisted" ? '<span class="visibility-note">Unlisted album · Anyone with this link can view and share it.</span>' : ""}</div>
+${chosen ? `<noscript><section class="selected-photo">${chosen.kind === "video" ? `<video src="${escapeHtml(chosen.viewerUrl)}" poster="${escapeHtml(chosen.posterUrl ?? chosen.gridUrl)}" controls playsinline preload="none" width="${chosen.width}" height="${chosen.height}"></video>` : `<img src="${escapeHtml(chosen.viewerUrl)}" width="${chosen.width}" height="${chosen.height}" alt="Selected match photo">`}<div class="rights">${rights(chosen)}</div><a class="button" href="${escapeHtml(chosen.downloadUrl)}" download>Download ${chosen.kind === "video" ? "video" : "photo"}</a><p><a href="${escapeHtml(url.pathname)}">Back to all media</a></p></section></noscript>` : ""}
 <div class="photo-grid" aria-label="Match photos">${album.media
       .map(
         (photo, index) =>
-          `<figure><a class="photo-link" href="${escapeHtml(photoHref(photo))}" data-photo-id="${escapeHtml(photo.id)}" data-viewer="${escapeHtml(photo.viewerUrl)}" data-download="${escapeHtml(photo.downloadUrl)}" aria-label="Open photo ${index + 1} of ${album.media.length}"><img src="${escapeHtml(photo.gridUrl)}" width="${photo.width}" height="${photo.height}" alt="Match photo ${index + 1}" loading="lazy" decoding="async"></a>${photoTime(photo)}<figcaption class="photo-rights" hidden>${rights(photo)}</figcaption></figure>`,
+          `<figure><a class="photo-link" href="${escapeHtml(photoHref(photo))}" data-photo-id="${escapeHtml(photo.id)}" data-kind="${photo.kind}" data-poster="${escapeHtml(photo.posterUrl ?? photo.gridUrl)}" data-viewer="${escapeHtml(photo.viewerUrl)}" data-download="${escapeHtml(photo.downloadUrl)}" aria-label="Open ${photo.kind === "video" ? "video" : "photo"} ${index + 1} of ${album.media.length}"><img src="${escapeHtml(photo.gridUrl)}" width="${photo.width}" height="${photo.height}" alt="${photo.kind === "video" ? "Video poster" : "Match photo"} ${index + 1}" loading="lazy" decoding="async">${photo.kind === "video" ? `<span class="video-badge">▶ ${duration(photo.duration)}</span>` : ""}</a>${photoTime(photo)}<figcaption class="photo-rights" hidden>${rights(photo)}</figcaption></figure>`,
       )
       .join("")}</div>
-<dialog id="viewer" aria-label="Photo viewer"><div class="viewer-shell"><div class="viewer-toolbar"><span id="viewer-position" aria-live="polite"></span><button id="viewer-close" type="button" aria-label="Close photo viewer">Close <span aria-hidden="true">×</span></button></div><div class="viewer-stage"><button id="viewer-previous" class="viewer-step" type="button" aria-label="Previous photo">‹</button><img id="viewer-image" alt=""><button id="viewer-next" class="viewer-step" type="button" aria-label="Next photo">›</button></div><div class="viewer-details"><div id="viewer-rights" class="rights"></div><div class="viewer-actions"><button id="viewer-share" type="button">Copy photo link</button><a id="viewer-download" class="button" download>Download photo</a></div></div><p id="viewer-status" class="visually-hidden" role="status"></p></div></dialog>`,
+<dialog id="viewer" aria-label="Media viewer"><div class="viewer-shell"><div class="viewer-toolbar"><span id="viewer-position" aria-live="polite"></span><button id="viewer-close" type="button" aria-label="Close media viewer">Close <span aria-hidden="true">×</span></button></div><div class="viewer-stage"><button id="viewer-previous" class="viewer-step" type="button" aria-label="Previous item">‹</button><img id="viewer-image" alt=""><video id="viewer-video" controls playsinline preload="none" hidden></video><button id="viewer-next" class="viewer-step" type="button" aria-label="Next item">›</button></div><div class="viewer-details"><div id="viewer-rights" class="rights"></div><div class="viewer-actions"><button id="viewer-share" type="button">Copy link</button><a id="viewer-download" class="button" download>Download</a></div></div><p id="viewer-status" class="visually-hidden" role="status"></p></div></dialog>`,
     preview,
   );
 }

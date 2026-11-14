@@ -12,5 +12,5 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "worker-configuration.d.ts"],
-  "exclude": ["test/cli.test.ts"]
+  "exclude": ["test/cli.test.ts", "test/video.test.ts"]
 }

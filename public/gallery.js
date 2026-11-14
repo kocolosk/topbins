@@ -5,6 +5,7 @@
   if (!photos.length) return;
 
   const image = document.querySelector("#viewer-image");
+  const video = document.querySelector("#viewer-video");
   const previous = document.querySelector("#viewer-previous");
   const next = document.querySelector("#viewer-next");
   const close = document.querySelector("#viewer-close");
@@ -20,9 +21,20 @@
   function show(index, updateHistory = true) {
     current = Math.max(0, Math.min(photos.length - 1, index));
     const photo = photos[current];
-    image.src = photo.dataset.viewer;
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    const isVideo = photo.dataset.kind === "video";
+    image.hidden = isVideo;
+    video.hidden = !isVideo;
+    image.removeAttribute("src");
+    if (isVideo) {
+      video.poster = photo.dataset.poster;
+      video.src = photo.dataset.viewer;
+    } else image.src = photo.dataset.viewer;
     image.alt = `Match photo ${current + 1} of ${photos.length}`;
     download.href = photo.dataset.download;
+    download.textContent = isVideo ? "Download video" : "Download photo";
     position.textContent = `${current + 1} / ${photos.length}`;
     credit.replaceChildren(
       ...[...photo.parentElement.querySelector(".photo-rights").childNodes].map(
@@ -31,7 +43,7 @@
     );
     previous.disabled = current === 0;
     next.disabled = current === photos.length - 1;
-    share.textContent = "Copy photo link";
+    share.textContent = "Copy link";
     status.textContent = "";
     if (updateHistory) {
       history.replaceState(null, "", photo.getAttribute("href"));
@@ -58,12 +70,16 @@
   dialog.addEventListener("close", () => {
     document.documentElement.classList.remove("viewer-open");
     image.removeAttribute("src");
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
     const url = new URL(location.href);
     url.searchParams.delete("photo");
     history.replaceState(null, "", `${url.pathname}${url.search}`);
     opener?.focus();
   });
   dialog.addEventListener("keydown", (event) => {
+    if (event.target === video) return;
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       event.preventDefault();
       show(current + (event.key === "ArrowLeft" ? -1 : 1));
@@ -96,10 +112,10 @@
     try {
       await navigator.clipboard.writeText(location.href);
       share.textContent = "Link copied";
-      status.textContent = "Photo link copied.";
+      status.textContent = "Media link copied.";
     } catch {
       status.textContent =
-        "Could not copy automatically. Copy the photo link from your address bar.";
+        "Could not copy automatically. Copy the link from your address bar.";
       share.textContent = "Copy from address bar";
     }
   });

@@ -16,7 +16,7 @@ export type Manifest = {
   visibility: "public" | "unlisted";
   defaults?: Rights;
   cover?: string;
-  files?: { file: string; id?: string }[];
+  files?: { file: string; id?: string; poster?: string; posterTime?: number }[];
 };
 
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -62,8 +62,8 @@ function filename(value: unknown, name: string): string {
   ) {
     throw new Error(`${name} must be a filename directly inside the folder`);
   }
-  if (!/\.jpe?g$/i.test(result))
-    throw new Error(`${name}: only JPEG photos are supported`);
+  if (!/\.(jpe?g|mp4)$/i.test(result))
+    throw new Error(`${name}: only JPEG photos and MP4 videos are supported`);
   return result;
 }
 
@@ -154,16 +154,46 @@ export function parseManifest(value: unknown): Manifest {
     const files = new Set<string>();
     const ids = new Set<string>();
     result.files = input.files.map((entry: unknown) => {
-      const item = object(entry, "file entry", ["file", "id"]);
+      const item = object(entry, "file entry", [
+        "file",
+        "id",
+        "poster",
+        "posterTime",
+      ]);
       const file = filename(item.file, "file");
       if (files.has(file)) throw new Error(`Duplicate file: ${file}`);
       files.add(file);
-      if (item.id === undefined) return { file };
-      const id = text(item.id, "file id").toLowerCase();
-      if (!uuid.test(id)) throw new Error("file id must be a UUID");
-      if (ids.has(id)) throw new Error(`Duplicate file id: ${id}`);
-      ids.add(id);
-      return { file, id };
+      const result: NonNullable<Manifest["files"]>[number] = { file };
+      if (item.id !== undefined) {
+        const id = text(item.id, "file id").toLowerCase();
+        if (!uuid.test(id)) throw new Error("file id must be a UUID");
+        if (ids.has(id)) throw new Error(`Duplicate file id: ${id}`);
+        ids.add(id);
+        result.id = id;
+      }
+      if (item.poster !== undefined || item.posterTime !== undefined) {
+        if (!/\.mp4$/i.test(file))
+          throw new Error("Poster options require an MP4 file.");
+        if (item.poster !== undefined && item.posterTime !== undefined)
+          throw new Error("Choose poster or posterTime, not both.");
+        if (item.poster !== undefined) {
+          result.poster = filename(item.poster, "poster");
+          if (!/\.jpe?g$/i.test(result.poster))
+            throw new Error("Poster must be a JPEG.");
+        }
+        if (item.posterTime !== undefined) {
+          if (
+            typeof item.posterTime !== "number" ||
+            !Number.isFinite(item.posterTime) ||
+            item.posterTime < 0
+          )
+            throw new Error(
+              "posterTime must be a nonnegative number of seconds.",
+            );
+          result.posterTime = item.posterTime;
+        }
+      }
+      return result;
     });
     if (result.cover && !files.has(result.cover))
       throw new Error("cover must be selected in files");

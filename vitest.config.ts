@@ -27,7 +27,11 @@ export default defineConfig({
         test: {
           name: "cli",
           environment: "node",
-          include: ["test/cli.test.ts", "test/pages.test.ts"],
+          include: [
+            "test/cli.test.ts",
+            "test/video.test.ts",
+            "test/pages.test.ts",
+          ],
         },
       },
     ],

@@ -25,7 +25,7 @@ function page(
       "X-Robots-Tag": "noindex, nofollow",
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy":
-        "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+        "default-src 'none'; img-src 'self'; media-src 'self'; script-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
       "Referrer-Policy": "no-referrer",
     },
   });

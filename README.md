@@ -1,11 +1,11 @@
 # topbins
 
 Cloudflare-native sports photo/video gallery. [SPEC.md](SPEC.md) is the product
-and architecture baseline. The first **local, photo-only publishing slice** is
-implemented: folder import, JPEG sanitization, a D1 catalog, authenticated draft
-preview, public/unlisted galleries, managed display sizes, and source downloads.
-Video and production launch work remain. No private sample media are included
-or required.
+and architecture baseline. Local photo/video publishing is implemented: folder
+import, JPEG sanitization, MP4 preflight/remux/posters, a D1 catalog,
+authenticated draft preview, public/unlisted galleries, managed display sizes,
+source downloads, and range-aware video playback. Production launch work remains.
+No private sample media are included or required.
 
 ## Quick start
 
@@ -23,13 +23,27 @@ mise install --locked node conda:ffmpeg conda:exiftool
 mise run setup
 mise exec -- npm run doctor
 mise run check
-mise run dev
+mise exec -- npm run demo
 ```
 
-Open http://127.0.0.1:8787. `GET /api/health` returns `{"status":"ok"}`;
-`/` shows public teams, or an empty state until a match is published locally.
-Stop development with Ctrl+C. No Cloudflare login or credentials are needed for
-setup/checks or browsing. Publishing and draft preview require a local token.
+Open **http://127.0.0.1:8790/albums/demo-match**. The demo generates two photos
+and a short video, creates its own manifest, applies local migrations, imports
+the album, and leaves the server running. Try the photo viewer, video playback,
+seeking, timestamps, and downloads. Stop with Ctrl+C.
+
+No exports folder, credentials, Cloudflare login, or real media are needed.
+The demo uses an intentionally public test token and isolated state under
+`.wrangler/demo/`; do not use it for private media. It binds loopback only and
+never deploys. To run the same end-to-end checks and exit automatically:
+
+```sh
+mise exec -- npm run demo -- --smoke
+```
+
+For normal development, `mise run dev` serves http://127.0.0.1:8787 using separate
+state at `.wrangler/state/`. `GET /api/health` returns `{"status":"ok"}`; the
+home page is empty until you import an album into that environment.
+Publishing and draft preview there require your own local token.
 Installation downloads public tool packages; the app, tests, D1 and R2 run locally.
 Do not use `wrangler dev --remote` or set bindings to `remote: true` casually.
 The explicit tool list scopes installation to this project, avoiding attempts
@@ -52,6 +66,8 @@ Do not rely on a globally installed Wrangler or media tool.
 | --- | --- |
 | `mise run setup` | `npm ci`, then local D1 migrations without an interactive prompt |
 | `mise run dev` | Wrangler local Worker, assets, D1, R2 and offline Images simulation |
+| `mise exec -- npm run demo` | Generate/import synthetic mixed media and keep the demo server running on port 8790 |
+| `mise exec -- npm run demo -- --smoke` | Run the isolated end-to-end demo checks and stop |
 | `mise exec -- npm run db:migrate` | Apply migrations to local D1; may ask for confirmation |
 | `mise exec -- npm test` | Worker-runtime integration tests and Node CLI tests |
 | `mise exec -- npm run typecheck` | Strict Worker and separate Node CLI TypeScript checks |
@@ -84,6 +100,11 @@ credential setup, metadata/profile policy, and retry/replacement behavior:
 mise exec -- npm run cli -- import ./exports --manifest ./match.json --endpoint http://127.0.0.1:8787
 ```
 
+This command assumes **you have created `exports/`, exported media into it, and
+written `match.json`**. These example input paths are not supplied by the
+repository; use the demo above for a no-preparation trial. Both default input
+paths are ignored by Git to help keep private media and local manifests out.
+
 The first import creates a draft. Open the returned `/preview/...` URL and use
 username `publisher` with your local publisher token as the password.
 Add `--publish` to expose the album in your **local** gallery. Re-importing a
@@ -98,17 +119,26 @@ rejects non-loopback endpoints in this slice.
 - `src/pages.ts` / `src/site.ts`: server-rendered team/season/match pages and
   authenticated preview. All pages remain no-store/noindex during this local
   implementation phase.
-- `public/`: CSS and progressive photo-viewer JavaScript. Pages and source
+- `public/`: CSS and progressive media-viewer JavaScript. Pages and source
   downloads work without JavaScript; the viewer adds modal, touch, keyboard, and
-  individual-link behavior. No additional frontend framework or build tool.
+  individual-link behavior. Clips use native controls and never load in the grid.
+  No additional frontend framework or build tool.
 - `cli/`: Node 24 native TypeScript entry point, isolated from Worker types.
   ExifTool sanitizes temporary copies without modifying source exports.
+  FFprobe validates video, FFmpeg stream-copies MP4s for fast start and extracts
+  a poster without transcoding the clip. `cli/demo.ts` supplies synthetic inputs
+  and an isolated local environment.
 - `migrations/`: D1 migrations; team → season → match catalog and separate
   publisher-only metadata tables.
 - `test/`: Vitest using Cloudflare's current `@cloudflare/vitest-plugin` in
   workerd, plus Node-based CLI and rendering tests. Synthetic JPEG tests execute
   the pinned media tools and verify pixel equality, metadata removal, private
   keyword retention, profile handling, stable IDs, retry, and replacement.
+  Video tests verify packet equality, audio retention, metadata removal, rotation,
+  poster extraction, range/conditional responses, and visibility.
+  The intentionally truncated-upload case can produce a local R2 emulator
+  "Network connection lost" diagnostic; it asserts a 400 response and staging
+  cleanup. Investigate that diagnostic if it occurs outside this negative test.
 - `wrangler.jsonc`: local-safe binding source of truth. `worker-configuration.d.ts`
   is generated and committed, never manually edited.
 - `mise.toml` / `mise.lock`: exact Node/media-tool versions and resolved
@@ -122,7 +152,7 @@ Biome intentionally excludes Markdown to preserve the landed spec/instructions;
 SQL, TOML, YAML and prose are reviewed separately, not claimed as linted/formatted.
 
 CI runs installation, local migrations, real media-tool version probes and the
-same `mise run check` on Ubuntu, with read-only repository permission, no
+same `mise run check` plus `npm run demo -- --smoke` on Ubuntu, with read-only repository permission, no
 Cloudflare secrets and no deploy job. It also checks for tracked-file drift.
 Actions are SHA-pinned; Dependabot proposes npm and Actions updates. Toolchain
 updates require changing pins, regenerating both locks/types as appropriate, and
@@ -151,11 +181,12 @@ Remaining work under the spec:
 - Approval of additional embedded ICC profiles before importing exports that
   contain them. Unknown profiles fail closed rather than leak embedded text or
   change colors by assigning another profile.
-- Direct-play H.264/AAC MP4s, local probe/remux/poster processing preserving
-  audio, and streamed range-aware R2 serving. No server transcoder or mute flag.
 - Explicit deletion/unpublishing UX, complete catalog/asset backup and recovery,
   rights/contact approval, and real-device launch checks.
 
 The authenticated API exports each album's private metadata; a full-site export
 and recovery command is not implemented. See [the API contract](docs/publishing-api.md).
 The full SPEC acceptance checklist is **not** satisfied by these local checks.
+Video upload is currently a single request under 100,000,000 bytes; larger
+camera originals need a smaller web export. No multipart upload, server
+transcoder, Cloudflare Stream, or publishing-time mute option is implemented.

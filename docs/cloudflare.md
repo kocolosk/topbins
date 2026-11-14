@@ -2,7 +2,7 @@
 
 ## Current implementation status
 
-The photo-only slice is implemented and locally validated; it has **not** been
+The photo/video slice is implemented and locally validated; it has **not** been
 deployed. The remote site described below still serves the approved scaffold.
 Historical scaffold observations below do not imply the new routes are live.
 
@@ -11,7 +11,7 @@ contract and [publishing-cli.md](publishing-cli.md) for local operation:
 
 - D1 catalog and private metadata tables, team-scoped seasons, public/unlisted
   listing rules, and atomic album commits.
-- Local-only JPEG CLI, metadata sanitization, persistent IDs, explicit source
+- Local-only JPEG/MP4 CLI, metadata sanitization, persistent IDs, explicit source
   replacements, and private keyword preservation.
 - Bearer publisher authentication and Basic/Bearer draft preview, disabled when
   no runtime `PUBLISH_TOKEN` is supplied. Production authentication review remains
@@ -19,12 +19,17 @@ contract and [publishing-cli.md](publishing-cli.md) for local operation:
 - Images binding input/transform validation and approved display presets.
   Internal one-day variant caching is version/preset/format-specific and always
   follows a current publication check. Browser dynamic responses stay no-store.
-- Exact JPEG downloads with ETag and HEAD. Video/range serving remains future
-  work.
+- Exact JPEG/MP4 downloads, byte-range/conditional streaming, local FFprobe/
+  FFmpeg video preflight, fast-start remuxing, and single-frame posters.
+- An isolated synthetic demo (`npm run demo`) and an end-to-end smoke command,
+  both loopback-only with no Cloudflare credentials or private media.
 
 No remote configuration, entitlement, resource, DNS, migration, or deployment
 changes are included in this slice. Real Images fidelity and real-device
 validation remain launch gates. The CLI intentionally rejects remote endpoints.
+Video request size is capped below 100,000,000 bytes and requires Content-Length;
+larger camera files need a web export. Verify actual account/zone request limits
+before enabling remote publishing. This is not a multipart upload protocol.
 
 ## Initial read-only inspection
 

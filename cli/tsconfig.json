@@ -13,5 +13,10 @@
     "erasableSyntaxOnly": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["*.ts", "../test/cli.test.ts", "../vitest.config.ts"]
+  "include": [
+    "*.ts",
+    "../test/cli.test.ts",
+    "../test/video.test.ts",
+    "../vitest.config.ts"
+  ]
 }
