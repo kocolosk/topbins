@@ -1,7 +1,8 @@
+import { type AuthEnv, publisherAuthorized } from "./access";
 import { json, readLimitedBody, response } from "./http";
 import { uploadVideo } from "./video-upload";
 
-type PublisherEnv = Env & { PUBLISH_TOKEN?: string };
+type PublisherEnv = AuthEnv;
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const hash = /^[0-9a-f]{64}$/;
@@ -115,21 +116,13 @@ function token(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
-export function authorized(request: Request, env: PublisherEnv): boolean {
-  const expected = env.PUBLISH_TOKEN;
-  if (!expected) return false;
-  const actual = request.headers.get("Authorization");
-  if (!actual?.startsWith("Bearer ")) return false;
-  const a = new TextEncoder().encode(actual.slice(7));
-  const b = new TextEncoder().encode(expected);
-  return a.length === b.length && crypto.subtle.timingSafeEqual(a, b);
-}
 export async function publisher(
   request: Request,
   env: PublisherEnv,
   path: string,
 ): Promise<Response> {
-  if (!authorized(request, env)) return response("Unauthorized", 401);
+  if (!(await publisherAuthorized(request, env)))
+    return response("Unauthorized", 401);
   const asset = /^\/api\/publisher\/assets\/([0-9a-f]{64})$/.exec(path);
   if (asset) {
     const video = new URL(request.url).searchParams.get("type") === "video/mp4";

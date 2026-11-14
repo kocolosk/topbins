@@ -113,27 +113,74 @@ function rights(
   return result;
 }
 
-function localEndpoint(input: string): URL {
+const loopbackHosts = ["localhost", "127.0.0.1", "[::1]"];
+
+export interface Credentials {
+  headers: Record<string, string>;
+  secrets: string[];
+}
+
+// Loopback HTTP uses the local shared token. Any remote endpoint must be HTTPS
+// and authenticates with a Cloudflare Access service token; the shared token is
+// never sent over the network.
+export function endpointCredentials(
+  input: string,
+  environment: NodeJS.ProcessEnv,
+): { origin: URL; credentials: Credentials } {
   const url = new URL(input);
   if (
-    url.protocol !== "http:" ||
-    !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
     url.username ||
     url.password ||
     url.pathname !== "/" ||
     url.search ||
-    url.hash
+    url.hash ||
+    (url.protocol === "http:" && !loopbackHosts.includes(url.hostname)) ||
+    (url.protocol !== "http:" && url.protocol !== "https:")
   ) {
     throw new Error(
-      "Endpoint must be an explicit http://localhost or loopback origin",
+      "Endpoint must be an https:// origin or an explicit http://localhost loopback origin",
     );
   }
-  return url;
+  if (url.protocol === "http:") {
+    const token = environment.TOPBINS_PUBLISH_TOKEN;
+    if (!token) throw new Error("Set TOPBINS_PUBLISH_TOKEN in the environment");
+    return {
+      origin: url,
+      credentials: {
+        headers: { Authorization: `Bearer ${token}` },
+        secrets: [token],
+      },
+    };
+  }
+  const id = environment.TOPBINS_ACCESS_CLIENT_ID;
+  const secret = environment.TOPBINS_ACCESS_CLIENT_SECRET;
+  if (!id || !secret)
+    throw new Error(
+      "Set TOPBINS_ACCESS_CLIENT_ID and TOPBINS_ACCESS_CLIENT_SECRET (a Cloudflare Access service token) in the environment",
+    );
+  return {
+    origin: url,
+    credentials: {
+      headers: {
+        "CF-Access-Client-Id": id,
+        "CF-Access-Client-Secret": secret,
+      },
+      secrets: [id, secret],
+    },
+  };
+}
+
+class RedirectError extends Error {
+  constructor(method: string) {
+    super(
+      `${method} request was redirected (for example to a Cloudflare Access login). Check the service token and that its Access policy allows this path.`,
+    );
+  }
 }
 
 async function request(
   url: URL,
-  token: string,
+  credentials: Credentials,
   method: string,
   body?: string | Uint8Array<ArrayBuffer>,
   contentType?: string,
@@ -144,16 +191,19 @@ async function request(
       const response = await fetch(url, {
         method,
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...credentials.headers,
           ...(contentType ? { "Content-Type": contentType } : {}),
           ...extraHeaders,
         },
         body,
-        redirect: "error",
+        redirect: "manual",
         signal: AbortSignal.timeout(30_000),
       });
+      if (response.status >= 300 && response.status < 400)
+        throw new RedirectError(method);
       if (response.status < 500 && response.status !== 429) return response;
-    } catch {
+    } catch (error) {
+      if (error instanceof RedirectError) throw error;
       // Network errors and timeouts are safe to retry because writes use PUT.
     }
     if (attempt < 2)
@@ -222,9 +272,7 @@ async function performImport(
 ): Promise<void> {
   folder = resolve(folder);
   manifestPath = resolve(manifestPath);
-  const origin = localEndpoint(endpoint);
-  const token = process.env.TOPBINS_PUBLISH_TOKEN;
-  if (!token) throw new Error("Set TOPBINS_PUBLISH_TOKEN in the environment");
+  const { origin, credentials } = endpointCredentials(endpoint, process.env);
   const manifest = parseManifest(
     JSON.parse(await readFile(manifestPath, "utf8")),
   );
@@ -557,7 +605,7 @@ async function performImport(
     // display metadata, not a reliable burst-ordering key.
     // Importing more photos must not implicitly unpublish an existing album.
     const albumUrl = new URL(`/api/publisher/albums/${manifest.id}`, origin);
-    const existing = await request(albumUrl, token, "GET");
+    const existing = await request(albumUrl, credentials, "GET");
     let publicationState = publish ? "published" : "draft";
     if (existing.ok) {
       const saved = (await existing.json()) as { state?: unknown };
@@ -571,11 +619,11 @@ async function performImport(
       console.log(`Staging asset ${index + 1} of ${assets.length}`);
       const url = new URL(`/api/publisher/assets/${asset.sha256}`, origin);
       if (asset.type) url.searchParams.set("type", asset.type);
-      const head = await request(url, token, "HEAD");
+      const head = await request(url, credentials, "HEAD");
       if (head.status === 404) {
         const upload = await request(
           url,
-          token,
+          credentials,
           "PUT",
           new Uint8Array(await readFile(asset.path)),
           asset.type ?? "image/jpeg",
@@ -591,7 +639,7 @@ async function performImport(
       : undefined;
     const response = await request(
       albumUrl,
-      token,
+      credentials,
       "PUT",
       JSON.stringify({
         team: manifest.team,
@@ -615,7 +663,12 @@ async function performImport(
     await saveState(statePath, state);
     const result = (await response.json()) as Record<string, unknown>;
     for (const key of ["albumUrl", "previewUrl"])
-      if (typeof result[key] === "string" && !result[key].includes(token))
+      if (
+        typeof result[key] === "string" &&
+        !credentials.secrets.some((secret) =>
+          result[key]?.toString().includes(secret),
+        )
+      )
         console.log(`${key}: ${result[key]}`);
   } finally {
     await rm(temporary, { recursive: true, force: true });

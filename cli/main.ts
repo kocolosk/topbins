@@ -6,10 +6,14 @@ const help = `topbins — local-folder publisher
 Usage:
   npm run cli -- --help
   npm run demo
-  npm run cli -- import <folder> --manifest <path> --endpoint http://127.0.0.1:8787 [--publish] [--replace]
+  npm run cli -- import <folder> --manifest <path> --endpoint <origin> [--publish] [--replace]
   npm run doctor
 
-Set TOPBINS_PUBLISH_TOKEN in the environment. Only explicit local HTTP endpoints are accepted.
+Credentials come from the environment, never from arguments:
+  http://localhost endpoints  TOPBINS_PUBLISH_TOKEN
+  https:// endpoints          TOPBINS_ACCESS_CLIENT_ID and TOPBINS_ACCESS_CLIENT_SECRET
+                              (a Cloudflare Access service token)
+Plain HTTP is accepted only for loopback.
 doctor verifies ExifTool, FFmpeg and FFprobe can execute.`;
 
 const args = process.argv.slice(2);

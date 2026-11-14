@@ -14,8 +14,9 @@ contract and [publishing-cli.md](publishing-cli.md) for local operation:
 - Local-only JPEG/MP4 CLI, metadata sanitization, persistent IDs, explicit source
   replacements, and private keyword preservation.
 - Bearer publisher authentication and Basic/Bearer draft preview, disabled when
-  no runtime `PUBLISH_TOKEN` is supplied. Production authentication review remains
-  required; the Access recommendation below has not been implemented.
+  no runtime `PUBLISH_TOKEN` is supplied. Worker-side Access JWT verification is
+  implemented and deployed; the Access application, policies and service token
+  exist (see the setup record in [access.md](access.md)).
 - Images binding input/transform validation and approved display presets.
   Internal one-day variant caching is version/preset/format-specific and always
   follows a current publication check. Browser dynamic responses stay no-store.
@@ -26,7 +27,8 @@ contract and [publishing-cli.md](publishing-cli.md) for local operation:
 
 No remote configuration, entitlement, resource, DNS, migration, or deployment
 changes are included in this slice. Real Images fidelity and real-device
-validation remain launch gates. The CLI intentionally rejects remote endpoints.
+validation remain launch gates. The CLI accepts HTTPS endpoints only with Access service-token credentials
+(see [access.md](access.md)).
 Video request size is capped below 100,000,000 bytes and requires Content-Length;
 larger camera files need a web export. Verify actual account/zone request limits
 before enabling remote publishing. This is not a multipart upload protocol.
