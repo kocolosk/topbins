@@ -31,6 +31,7 @@ export default defineConfig({
             "test/cli.test.ts",
             "test/video.test.ts",
             "test/pages.test.ts",
+            "test/preview.test.ts",
           ],
         },
       },

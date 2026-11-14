@@ -152,8 +152,13 @@ Biome intentionally excludes Markdown to preserve the landed spec/instructions;
 SQL, TOML, YAML and prose are reviewed separately, not claimed as linted/formatted.
 
 CI runs installation, local migrations, real media-tool version probes and the
-same `mise run check` plus `npm run demo -- --smoke` on Ubuntu, with read-only repository permission, no
-Cloudflare secrets and no deploy job. It also checks for tracked-file drift.
+same `mise run check` plus `npm run demo -- --smoke` on Ubuntu. The check job has
+read-only repository permission and no Cloudflare credentials, and checks for
+tracked-file drift. Separately,
+Cloudflare Workers Builds runs the same checks before deploying branch-named
+public Previews using shared staging storage. No Cloudflare token is stored in
+GitHub. See [PR previews](docs/pr-previews.md) for the Cloudflare build settings,
+access boundaries, explicit staging migrations and branch-deletion cleanup.
 Actions are SHA-pinned; Dependabot proposes npm and Actions updates. Toolchain
 updates require changing pins, regenerating both locks/types as appropriate, and
 running the documented checks. For mise lock updates:
@@ -166,10 +171,11 @@ mise lock --platform macos-arm64,linux-x64
 
 See [docs/cloudflare.md](docs/cloudflare.md) for read-only account findings,
 binding choices, transformation limits, costs, secrets and approval-gated setup.
-There is intentionally no automated deployment script.
+Production deployment remains manual; PR preview deployment is automated.
 The approved scaffold is available at https://photos.kocolosk.net with dedicated
-D1/R2 resources. Only the placeholder is public: `workers.dev`, preview URLs and
-public bucket domains remain disabled. No gallery or media has been published.
+D1/R2 resources. Only the placeholder is public on production: its `workers.dev`,
+version URLs and public bucket domains remain disabled. PR previews use a separate
+Worker and staging storage. No production gallery or media has been published.
 The ignored machine-local remote config is separate from the local dev config;
 see the remote setup record for identifiers and verification. Local setup/checks
 still require no Cloudflare credentials.
