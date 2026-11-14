@@ -20,7 +20,7 @@ export default defineConfig({
         ],
         test: {
           name: "worker",
-          include: ["test/worker.test.ts"],
+          include: ["test/worker.test.ts", "test/access.test.ts"],
         },
       },
       {
@@ -29,6 +29,7 @@ export default defineConfig({
           environment: "node",
           include: [
             "test/cli.test.ts",
+            "test/credentials.test.ts",
             "test/video.test.ts",
             "test/pages.test.ts",
             "test/preview.test.ts",

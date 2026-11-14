@@ -1,3 +1,4 @@
+import { type AuthEnv, authMode, publisherAuthorized } from "./access";
 import {
   getPreviewAlbum,
   getPublicAlbum,
@@ -9,7 +10,7 @@ import {
 import { serveMedia } from "./media";
 import { albumPage, homePage, seasonPage, teamPage } from "./pages";
 
-type SiteEnv = Env & { PUBLISH_TOKEN?: string };
+type SiteEnv = AuthEnv;
 
 function page(
   request: Request,
@@ -31,33 +32,6 @@ function page(
   });
 }
 
-async function previewAuthorized(
-  request: Request,
-  token: string | undefined,
-): Promise<boolean> {
-  if (!token) return false;
-  const authorization = request.headers.get("Authorization") ?? "";
-  let supplied = "";
-  if (authorization.startsWith("Bearer ")) {
-    supplied = authorization.slice(7);
-  } else if (authorization.startsWith("Basic ")) {
-    try {
-      const credentials = atob(authorization.slice(6));
-      if (!credentials.startsWith("publisher:")) return false;
-      supplied = credentials.slice("publisher:".length);
-    } catch {
-      return false;
-    }
-  }
-  const encoder = new TextEncoder();
-  const expected = await crypto.subtle.digest("SHA-256", encoder.encode(token));
-  const actual = await crypto.subtle.digest(
-    "SHA-256",
-    encoder.encode(supplied),
-  );
-  return crypto.subtle.timingSafeEqual(expected, actual);
-}
-
 export async function handleSite(
   request: Request,
   env: SiteEnv,
@@ -67,17 +41,19 @@ export async function handleSite(
   const preview =
     path.startsWith("/preview/") || path.startsWith("/api/preview/");
   if (preview) {
-    if (!(await previewAuthorized(request, env.PUBLISH_TOKEN))) {
+    if (!(await publisherAuthorized(request, env, true))) {
       const result = page(
         request,
         "Publisher credentials required.",
         401,
         "text/plain; charset=utf-8",
       );
-      result.headers.set(
-        "WWW-Authenticate",
-        'Basic realm="topbins publisher", charset="UTF-8"',
-      );
+      // Access mode has no password prompt: Access performs the login.
+      if (authMode(env) === "token")
+        result.headers.set(
+          "WWW-Authenticate",
+          'Basic realm="topbins publisher", charset="UTF-8"',
+        );
       return result;
     }
     if (path.startsWith("/preview/media/")) {

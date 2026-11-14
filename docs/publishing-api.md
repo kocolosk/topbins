@@ -1,7 +1,9 @@
 # Photo/video publishing API
 
-All `/api/publisher/*` requests require `Authorization: Bearer <token>`.
-Configure `PUBLISH_TOKEN` as a Worker secret; unset or empty disables publishing.
+All `/api/publisher/*` requests require authentication. In production this is a
+Cloudflare Access JWT verified by the Worker ([access.md](access.md)). For local
+development (no Access variables) it is `Authorization: Bearer <token>` with
+`PUBLISH_TOKEN`; unset or empty disables publishing.
 Never put credentials in URLs. Preview uses the same token, but requires
 authentication on every preview page and asset request.
 The trusted local publisher must sanitize JPEG/MP4 metadata before upload;
@@ -71,8 +73,8 @@ without authenticated preview. Dynamic responses use `Cache-Control: no-store`.
   `/api/teams/:teamId/seasons/:seasonId/albums`: public JSON listings.
 - `/api/albums/:albumId`, `/api/shared/:shareToken`: `{album}` public projections.
 - `/preview/:albumId`, `/api/preview/:albumId`: authenticated, private-free draft
-  gallery/JSON, using Basic username `publisher` and password `PUBLISH_TOKEN`,
-  or Bearer authentication. Browser asset URLs are also under `/preview/`.
+  gallery/JSON. Locally: Basic username `publisher` and password `PUBLISH_TOKEN`,
+  or Bearer. In production: the Cloudflare Access JWT only. Browser asset URLs are also under `/preview/`.
 
 No viewer login is required for published albums. Every HTML page remains
 noindex during this implementation phase, including public galleries.
@@ -97,9 +99,9 @@ the complete 200 representation. HEAD ignores Range and never returns a body.
 Draft source/poster/preview requests require authentication before any bytes
 or conditional response can be returned.
 
-The shared runtime token and Basic browser preview are a minimal local-first
-authentication implementation. Review the production policy (including the
-Cloudflare Access recommendation) before an approved deployment.
+The shared runtime token and Basic browser preview are the local-development
+mode. Production uses Cloudflare Access ([access.md](access.md)); the Access
+application and policies must be created and verified before deployment.
 
 Production image transformation fidelity, service limits, sanitization, and
 recovery require independent launch validation; local simulation is not proof.

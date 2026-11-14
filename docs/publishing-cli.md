@@ -21,7 +21,8 @@ is needed and an unset token fails closed.
 mise exec -- npm run cli -- import ./exports --manifest ./match.json --endpoint http://127.0.0.1:8787
 ```
 
-The endpoint is mandatory and must be an HTTP loopback origin. The command
+The endpoint is mandatory: an HTTP loopback origin, or an HTTPS origin using a
+Cloudflare Access service token ([access.md](access.md)). The command
 creates a draft unless `--publish` is present. Re-imports preserve an existing
 album's publication state; omission of `--publish` never implicitly unpublishes.
 Visibility is explicitly provided in the manifest. The response provides

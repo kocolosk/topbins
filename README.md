@@ -109,7 +109,8 @@ The first import creates a draft. Open the returned `/preview/...` URL and use
 username `publisher` with your local publisher token as the password.
 Add `--publish` to expose the album in your **local** gallery. Re-importing a
 published album without that flag preserves its publication state. The CLI
-rejects non-loopback endpoints in this slice.
+accepts loopback HTTP, or HTTPS with a Cloudflare Access service token (see
+[Access](docs/access.md)).
 
 ## Stack and layout
 
@@ -182,8 +183,9 @@ still require no Cloudflare credentials.
 
 Remaining work under the spec:
 
-- Production publisher authentication review, remote publishing transport,
-  launch policies, approved deployment, and real managed Images validation.
+- A real HTTPS import through Cloudflare Access (the application, service token and
+  Worker verifier are deployed and verified; see [Access](docs/access.md)), launch
+  policies, and real managed Images validation.
 - Approval of additional embedded ICC profiles before importing exports that
   contain them. Unknown profiles fail closed rather than leak embedded text or
   change colors by assigning another profile.
