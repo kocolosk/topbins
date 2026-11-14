@@ -18,6 +18,7 @@
     "../scripts/*.ts",
     "../test/cli.test.ts",
     "../test/preview.test.ts",
+    "../test/video.test.ts",
     "../vitest.config.ts"
   ]
 }

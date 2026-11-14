@@ -5,6 +5,7 @@ const help = `topbins — local-folder publisher
 
 Usage:
   npm run cli -- --help
+  npm run demo
   npm run cli -- import <folder> --manifest <path> --endpoint http://127.0.0.1:8787 [--publish] [--replace]
   npm run doctor
 

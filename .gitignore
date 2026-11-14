@@ -9,6 +9,8 @@ coverage/
 !.env.example
 wrangler.remote.jsonc
 examples/
+/exports/
+/match.json
 .DS_Store
 .topbins-state.json
 .topbins-state.json.lock

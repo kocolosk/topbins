@@ -16,6 +16,7 @@ import { join, resolve } from "node:path";
 import { parseManifest, validateRightsUrl } from "./manifest.ts";
 import type { Rights } from "./manifest.ts";
 import { validateColorProfile } from "./color-profiles.ts";
+import { prepareVideo, VIDEO_LIMIT } from "./video.ts";
 
 type Metadata = Record<string, unknown>;
 type Entry = { id: string; hash: string };
@@ -68,8 +69,11 @@ async function readSource(path: string): Promise<Buffer> {
   const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = await file.stat();
-    if (!stat.isFile() || stat.size >= 20_000_000)
-      throw new Error("Source must be a regular file under 20 MB");
+    const limit = /\.mp4$/i.test(path) ? VIDEO_LIMIT : 20_000_000;
+    if (!stat.isFile() || stat.size >= limit)
+      throw new Error(
+        `Source must be a regular file under ${limit / 1_000_000} MB`,
+      );
     return await file.readFile();
   } finally {
     await file.close();
@@ -133,6 +137,7 @@ async function request(
   method: string,
   body?: string | Uint8Array<ArrayBuffer>,
   contentType?: string,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Response> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -141,6 +146,7 @@ async function request(
         headers: {
           Authorization: `Bearer ${token}`,
           ...(contentType ? { "Content-Type": contentType } : {}),
+          ...extraHeaders,
         },
         body,
         redirect: "error",
@@ -176,12 +182,29 @@ export async function importFolder(
   publish: boolean,
   replace: boolean,
 ): Promise<void> {
+  const directory = await lstat(resolve(folder)).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT")
+        throw new Error(
+          `Import folder does not exist: ${resolve(folder)}. Create an export folder and a match manifest first; see docs/publishing-cli.md or run npm run demo.`,
+        );
+      throw error;
+    },
+  );
+  if (!directory.isDirectory())
+    throw new Error(`Import path is not a directory: ${resolve(folder)}`);
   const lockPath = join(resolve(folder), ".topbins-state.json.lock");
-  const lock = await open(lockPath, "wx", 0o600).catch(() => {
-    throw new Error(
-      "Cannot acquire import lock. Check folder permissions and whether another import is running. Remove .topbins-state.json.lock only after confirming no import is active.",
-    );
-  });
+  const lock = await open(lockPath, "wx", 0o600).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "EEXIST")
+        throw new Error(
+          "An import lock already exists. Remove .topbins-state.json.lock only after confirming no import is active.",
+        );
+      throw new Error(
+        `Cannot create import lock (${error.code ?? "filesystem error"}). Check export-folder permissions.`,
+      );
+    },
+  );
   try {
     await performImport(folder, manifestPath, endpoint, publish, replace);
   } finally {
@@ -215,17 +238,20 @@ async function performImport(
         join(folder, name) !== manifestPath,
     );
   names.sort();
-  if (!names.length) throw new Error("No photos selected");
+  if (!names.length) throw new Error("No media selected");
   for (const name of names) {
-    if (!/\.jpe?g$/i.test(name))
+    if (!/\.(jpe?g|mp4)$/i.test(name))
       throw new Error(
-        `${name}: unsupported file; this slice supports JPEG photos only`,
+        `${name}: unsupported file; select JPEG photos or MP4 videos`,
       );
     const stat = await lstat(join(folder, name));
     if (!stat.isFile() || stat.isSymbolicLink())
       throw new Error(`${name}: expected a regular file, not a symlink`);
-    if (stat.size >= 20_000_000)
-      throw new Error(`${name}: source must be under 20 MB`);
+    const limit = /\.mp4$/i.test(name) ? VIDEO_LIMIT : 20_000_000;
+    if (stat.size >= limit)
+      throw new Error(
+        `${name}: source must be under ${limit / 1_000_000} MB; export a smaller web version`,
+      );
   }
   if (manifest.cover && !names.includes(manifest.cover))
     throw new Error("Cover is not among the selected files");
@@ -299,14 +325,97 @@ async function performImport(
   const temporary = await mkdtemp(join(tmpdir(), "topbins-"));
   try {
     const media: Record<string, unknown>[] = [];
-    const assets: { sha256: string; path: string }[] = [];
+    const assets: {
+      sha256: string;
+      path: string;
+      type?: string;
+      headers?: Record<string, string>;
+    }[] = [];
     for (const [index, name] of names.entries()) {
       const bytes = await readSource(join(folder, name));
       if (hash(bytes) !== sourceHashes.get(name))
         throw new Error(`${name}: source changed during import`);
-      const source = join(temporary, `${index}-input.jpg`);
+      const isVideo = /\.mp4$/i.test(name);
+      const source = join(
+        temporary,
+        `${index}-input.${isVideo ? "mp4" : "jpg"}`,
+      );
       await writeFile(source, bytes, { mode: 0o600 });
       const metadata = probe(source);
+      if (
+        isVideo &&
+        (bytes.includes(Buffer.from("c2pa")) ||
+          bytes.includes(Buffer.from("jumb")) ||
+          Object.keys(metadata).some((key) => /c2pa|jumbf/i.test(key)))
+      )
+        throw new Error(
+          `${name}: Content Credentials/JUMBF detected; evaluate provenance before importing`,
+        );
+      if (isVideo) {
+        const output = join(temporary, `${index}.mp4`);
+        const poster = join(temporary, `${index}-poster.jpg`);
+        const selection = manifest.files?.find((file) => file.file === name);
+        let posterPath: string | undefined;
+        if (selection?.poster) {
+          const original = join(folder, selection.poster);
+          const stat = await lstat(original);
+          if (!stat.isFile() || stat.isSymbolicLink())
+            throw new Error("Poster must be a regular JPEG, not a symlink.");
+          posterPath = join(temporary, `${index}-supplied-poster.jpg`);
+          await writeFile(posterPath, await readSource(original), {
+            mode: 0o600,
+          });
+          validateColorProfile(colorProfile(posterPath));
+          const posterBytes = await readFile(posterPath);
+          if (
+            posterBytes.includes(Buffer.from("c2pa")) ||
+            posterBytes.includes(Buffer.from("jumb"))
+          )
+            throw new Error(
+              "Poster contains Content Credentials/JUMBF; evaluate provenance before importing.",
+            );
+        }
+        const prepared = await prepareVideo(source, output, poster, {
+          posterTime: selection?.posterTime,
+          posterPath,
+        });
+        const posterSha256 = hash(prepared.posterBytes);
+        const sha256 = hash(await readFile(output));
+        assets.push({ sha256: posterSha256, path: poster });
+        assets.push({
+          sha256,
+          path: output,
+          type: "video/mp4",
+          headers: {
+            "X-Video-Width": String(prepared.width),
+            "X-Video-Height": String(prepared.height),
+            "X-Video-Duration": String(prepared.duration),
+          },
+        });
+        media.push({
+          id: entries[name]?.id,
+          sha256,
+          width: prepared.width,
+          height: prepared.height,
+          kind: "video",
+          duration: prepared.duration,
+          posterSha256,
+          captureTime: prepared.captureTime,
+          ...rights(metadata, manifest.defaults ?? {}, name),
+          privateMetadata: {
+            originalFilename: name,
+            keywords: Object.fromEntries(
+              Object.entries(metadata).filter(([key]) =>
+                /^(IPTC:Keywords|XMP-dc:Subject|XMP-lr:HierarchicalSubject)$/.test(
+                  key,
+                ),
+              ),
+            ),
+          },
+          ...(replace ? { replace: true } : {}),
+        });
+        continue;
+      }
       if (metadata["File:FileType"] !== "JPEG")
         throw new Error(`${name}: not a JPEG`);
       const originalProfile = colorProfile(source);
@@ -459,8 +568,9 @@ async function performImport(
       throw new Error(`Album check failed (HTTP ${existing.status})`);
     }
     for (const [index, asset] of assets.entries()) {
-      console.log(`Staging photo ${index + 1} of ${assets.length}`);
+      console.log(`Staging asset ${index + 1} of ${assets.length}`);
       const url = new URL(`/api/publisher/assets/${asset.sha256}`, origin);
+      if (asset.type) url.searchParams.set("type", asset.type);
       const head = await request(url, token, "HEAD");
       if (head.status === 404) {
         const upload = await request(
@@ -468,7 +578,8 @@ async function performImport(
           token,
           "PUT",
           new Uint8Array(await readFile(asset.path)),
-          "image/jpeg",
+          asset.type ?? "image/jpeg",
+          asset.headers,
         );
         if (!upload.ok)
           throw new Error(`Asset upload failed (HTTP ${upload.status})`);

@@ -1,4 +1,5 @@
 import { response } from "./http";
+import { serveSource } from "./source";
 
 export async function serveMedia(
   request: Request,
@@ -7,46 +8,39 @@ export async function serveMedia(
   preview = false,
 ): Promise<Response> {
   const match =
-    /^\/media\/([0-9a-f-]{36})\/([0-9a-f]{64})\/(grid|viewer|download)$/.exec(
+    /^\/media\/([0-9a-f-]{36})\/([0-9a-f]{64})\/(grid|viewer|download|play)$/.exec(
       path,
     );
   if (!match) return response("Not found", 404);
   const row =
-    await env.DB.prepare(`SELECT a.state, a.visibility FROM media m JOIN albums a ON a.id=m.album_id
-    WHERE m.id=? AND m.source_sha256=?`)
-      .bind(match[1], match[2])
-      .first<{ state: string; visibility: string }>();
+    await env.DB.prepare(`SELECT a.state, a.visibility, m.kind, m.source_sha256, m.poster_sha256
+    FROM media m JOIN albums a ON a.id=m.album_id
+    WHERE m.id=? AND (m.source_sha256=? OR (m.kind='video' AND m.poster_sha256=?))`)
+      .bind(match[1], match[2], match[2])
+      .first<{
+        state: string;
+        visibility: string;
+        kind: string;
+        source_sha256: string;
+        poster_sha256: string | null;
+      }>();
   if (!row || (!preview && row.state !== "published"))
     return response("Not found", 404);
-  if (match[3] === "download") {
-    const metadata = await env.MEDIA.head(`sources/${match[2]}.jpg`);
-    if (!metadata) return response("Not found", 404);
-    const etag = metadata.httpEtag;
-    const matches = (request.headers.get("If-None-Match") ?? "")
-      .split(",")
-      .some(
-        (value) =>
-          value.trim() === "*" || value.trim().replace(/^W\//, "") === etag,
-      );
-    if (matches) {
-      const result = response(null, 304, "image/jpeg");
-      result.headers.set("ETag", etag);
-      return result;
-    }
-    const object =
-      request.method === "HEAD"
-        ? null
-        : await env.MEDIA.get(`sources/${match[2]}.jpg`);
-    if (request.method !== "HEAD" && !object) return response("Not found", 404);
-    const result = response(object?.body ?? null, 200, "image/jpeg");
-    result.headers.set(
-      "Content-Disposition",
-      `attachment; filename="photo-${match[1]}.jpg"`,
+  const video = row.kind === "video";
+  if (match[3] === "download" || match[3] === "play") {
+    if (match[2] !== row.source_sha256 || (!video && match[3] === "play"))
+      return response("Not found", 404);
+    return serveSource(
+      request,
+      env.MEDIA,
+      `sources/${match[2]}.${video ? "mp4" : "jpg"}`,
+      video ? "video/mp4" : "image/jpeg",
+      `${video ? "video" : "photo"}-${match[1]}.${video ? "mp4" : "jpg"}`,
+      match[3] === "download",
     );
-    result.headers.set("Content-Length", String(metadata.size));
-    result.headers.set("ETag", etag);
-    return result;
   }
+  if (video && match[2] !== row.poster_sha256)
+    return response("Not found", 404);
   const accept = request.headers.get("Accept") ?? "";
   const accepts = (type: string) =>
     accept.split(",").some((part) => {

@@ -20,6 +20,25 @@ import { srgbProfileBase64 } from "./icc-fixture.ts";
 const execute = promisify(execFile);
 const srgbProfile = Buffer.from(srgbProfileBase64, "base64");
 
+it("reports a missing export folder instead of a misleading lock failure", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "topbins-missing-"));
+  try {
+    const result = await execute(process.execPath, [
+      "cli/main.ts",
+      "import",
+      join(dir, "missing"),
+      "--manifest",
+      join(dir, "missing.json"),
+      "--endpoint",
+      "http://127.0.0.1:8787",
+    ]).catch((error) => error);
+    expect(result.stderr).toContain("Import folder does not exist");
+    expect(result.stderr).not.toContain("Cannot acquire import lock");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 it("imports a synthetic JPEG without changing pixels or exposing keywords", async () => {
   const dir = await mkdtemp(join(tmpdir(), "topbins-test-"));
   const requests: { method: string; url: string; body: Buffer }[] = [];
@@ -285,12 +304,28 @@ describe("publishing manifest validation", () => {
     ).toMatchObject({ ...valid, cover: "photo.JPG" });
   });
 
+  it("accepts MP4 poster selection but rejects ambiguous or unsafe options", () => {
+    expect(
+      parseManifest({
+        ...valid,
+        files: [{ file: "clip.mp4", posterTime: 1.5 }],
+      }).files?.[0],
+    ).toMatchObject({ file: "clip.mp4", posterTime: 1.5 });
+    for (const item of [
+      { file: "clip.mp4", posterTime: -1 },
+      { file: "clip.mp4", poster: "../private.jpg" },
+      { file: "clip.mp4", poster: "poster.jpg", posterTime: 0 },
+      { file: "photo.jpg", posterTime: 0 },
+    ])
+      expect(() => parseManifest({ ...valid, files: [item] })).toThrow();
+  });
+
   it("rejects unsafe paths, non-photos, invalid dates and unknown fields", () => {
     for (const file of [
       "../photo.jpg",
       "sub/photo.jpg",
       "sub\\photo.jpg",
-      "video.mp4",
+      "video.mov",
     ]) {
       expect(() => parseManifest({ ...valid, files: [{ file }] })).toThrow();
     }

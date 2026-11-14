@@ -3,6 +3,199 @@ import { env, exports } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker";
 
+describe("video transport and visibility", () => {
+  const token = "synthetic-video-token";
+  const secretEnv = { ...env, PUBLISH_TOKEN: token };
+  const base = "https://example.test";
+  const id = "77777777-7777-4777-8777-777777777777";
+  const poster = "c".repeat(64);
+  const bytes = new Uint8Array([
+    0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0, 105, 115,
+    111, 109, 109, 112, 52, 50,
+  ]);
+  const sha = async (data: Uint8Array) =>
+    Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", data)),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("");
+  async function call(path: string, init: RequestInit = {}) {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${token}`);
+    return worker.fetch(
+      new Request(base + path, { ...init, headers }),
+      secretEnv,
+    );
+  }
+  const payload = (hash: string, state: string) => ({
+    team: { id: "video-team", title: "Video team" },
+    season: { id: "fall-2026", title: "Fall 2026" },
+    title: "A clip",
+    date: "2026-10-10",
+    visibility: "unlisted",
+    state,
+    media: [
+      {
+        id,
+        kind: "video",
+        sha256: hash,
+        width: 80,
+        height: 60,
+        duration: 2,
+        posterSha256: poster,
+        captureTime: null,
+        credit: null,
+        copyright: null,
+        usageTerms: null,
+        rightsUrl: null,
+        privateMetadata: { originalFilename: "private-camera-name.mp4" },
+      },
+    ],
+  });
+  const upload = (
+    data: Uint8Array,
+    hash: string,
+    length: string = String(data.length),
+  ) =>
+    call(`/api/publisher/assets/${hash}?type=video/mp4`, {
+      method: "PUT",
+      body: data,
+      headers: {
+        "Content-Type": "video/mp4",
+        "Content-Length": length,
+        "X-Video-Width": "80",
+        "X-Video-Height": "60",
+        "X-Video-Duration": "2",
+      },
+    });
+  it("stages streaming uploads with size/digest checks and requires a poster before commit", async () => {
+    const hash = await sha(bytes);
+    expect((await upload(bytes, hash, "100000000")).status).toBe(413);
+    expect((await upload(bytes, "d".repeat(64))).status).toBe(400);
+    // The emulator can log "Network connection lost" when its internal R2 RPC
+    // body is intentionally aborted; the app must still return 400 and clean up.
+    const short = await upload(bytes.slice(0, 12), hash, "24");
+    expect(short.status).toBe(400);
+    expect(await env.MEDIA.head(`sources/${hash}.mp4`)).toBeNull();
+    const invalid = new Uint8Array(24).fill(7);
+    const invalidHash = await sha(invalid);
+    expect((await upload(invalid, invalidHash)).status).toBe(400);
+    expect(await env.MEDIA.head(`sources/${invalidHash}.mp4`)).toBeNull();
+    expect(await env.MEDIA.head(`sources/${"d".repeat(64)}.mp4`)).toBeNull();
+    expect((await env.MEDIA.list({ prefix: "staging/" })).objects).toHaveLength(
+      0,
+    );
+    expect((await upload(bytes, hash)).status).toBe(200);
+    const update = await call("/api/publisher/albums/video-match", {
+      method: "PUT",
+      body: JSON.stringify(payload(hash, "published")),
+    });
+    expect(update.status).toBe(409);
+    expect((await call("/api/albums/video-match")).status).toBe(404);
+  });
+  it("streams published/unlisted and authenticated preview clips with correct conditional byte ranges", async () => {
+    const hash = await sha(bytes);
+    await env.MEDIA.put(
+      `sources/${poster}.jpg`,
+      new Uint8Array([255, 216, 255, 217]),
+      { customMetadata: { width: "80", height: "60" } },
+    );
+    const write = (state: string) =>
+      call("/api/publisher/albums/video-match", {
+        method: "PUT",
+        body: JSON.stringify(payload(hash, state)),
+      });
+    expect((await write("draft")).status).toBe(200);
+    const path = `/media/${id}/${hash}/play`;
+    expect((await call(path)).status).toBe(404);
+    expect(
+      (await worker.fetch(new Request(`${base}/preview${path}`), secretEnv))
+        .status,
+    ).toBe(401);
+    const preview = await call(`/preview${path}`, {
+      headers: { Range: "bytes=0-3" },
+    });
+    expect(preview.status).toBe(206);
+    expect(preview.headers.get("Cache-Control")).toBe("no-store");
+    expect((await write("published")).status).toBe(200);
+    expect((await call("/api/albums/video-match")).status).toBe(404);
+    const exported = (await (
+      await call("/api/publisher/albums/video-match")
+    ).json()) as { shareToken: string };
+    const shared = await call(`/api/shared/${exported.shareToken}`);
+    const dto = await shared.text();
+    expect(dto).toContain('"kind":"video"');
+    expect(dto).toContain('"duration":2');
+    expect(dto).not.toContain("private-camera-name");
+    const full = await call(path);
+    expect(full.status).toBe(200);
+    expect(full.headers.get("Content-Type")).toBe("video/mp4");
+    expect(new Uint8Array(await full.arrayBuffer())).toEqual(bytes);
+    const tag = full.headers.get("ETag") ?? "";
+    const ranges: [string, number, number][] = [
+      ["bytes=0-3", 0, 4],
+      ["bytes=4-", 4, bytes.length - 4],
+      ["bytes=-4", bytes.length - 4, 4],
+      ["bytes=20-999", 20, 4],
+    ];
+    for (const [range, offset, length] of ranges) {
+      const result = await call(path, { headers: { Range: range } });
+      expect(result.status).toBe(206);
+      expect(result.headers.get("Content-Range")).toBe(
+        `bytes ${offset}-${offset + length - 1}/${bytes.length}`,
+      );
+      expect(new Uint8Array(await result.arrayBuffer())).toEqual(
+        bytes.slice(offset, offset + length),
+      );
+    }
+    for (const range of [
+      "bytes=100-",
+      "bytes=-0",
+      "bytes=3-1",
+      "bytes=0-1,3-4",
+      "bytes=invalid",
+    ]) {
+      const result = await call(path, { headers: { Range: range } });
+      expect(result.status).toBe(416);
+      expect(result.headers.get("Content-Range")).toBe(
+        `bytes */${bytes.length}`,
+      );
+    }
+    expect(
+      (await call(path, { headers: { "If-None-Match": tag } })).status,
+    ).toBe(304);
+    const modified = full.headers.get("Last-Modified") ?? "";
+    const shifted = (seconds: number) =>
+      new Date(Date.parse(modified) + seconds * 1000).toUTCString();
+    for (const [validator, status] of [
+      [tag, 206],
+      [modified, 206],
+      ['"stale"', 200],
+      [shifted(-60), 200],
+      [shifted(60), 200],
+    ] as const) {
+      const result = await call(path, {
+        headers: { Range: "bytes=0-1", "If-Range": validator },
+      });
+      expect(result.status).toBe(status);
+      expect((await result.arrayBuffer()).byteLength).toBe(
+        status === 206 ? 2 : bytes.length,
+      );
+    }
+    const head = await call(path, {
+      method: "HEAD",
+      headers: { Range: "bytes=0-1" },
+    });
+    expect(head.status).toBe(200);
+    expect(head.body).toBeNull();
+    expect(head.headers.get("Content-Length")).toBe(String(bytes.length));
+    const download = await call(`/media/${id}/${hash}/download`);
+    expect(download.headers.get("Content-Disposition")).toContain(".mp4");
+    expect(new Uint8Array(await download.arrayBuffer())).toEqual(bytes);
+    expect((await write("draft")).status).toBe(200);
+    expect((await call(path)).status).toBe(404);
+  });
+});
+
 declare global {
   namespace Cloudflare {
     interface Env {

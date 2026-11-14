@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "wrangler dev --local --ip 127.0.0.1",
+    "demo": "node cli/demo.ts",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "types:generate": "wrangler types",
     "types:check": "wrangler types --check",

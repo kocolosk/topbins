@@ -32,4 +32,5 @@ jobs:
       - run: mise run setup
       - run: mise exec -- npm run doctor
       - run: mise run check
+      - run: mise exec -- npm run demo -- --smoke
       - run: git diff --exit-code

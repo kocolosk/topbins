@@ -1,5 +1,8 @@
 export interface MediaDTO {
   id: string;
+  kind: "photo" | "video";
+  duration: number | null;
+  posterUrl: string | null;
   width: number;
   height: number;
   captureTime: string | null;
@@ -36,6 +39,9 @@ interface CatalogRow {
   visibility: string;
   cover_media_id: string | null;
   media_id: string | null;
+  kind: "photo" | "video";
+  duration: number | null;
+  poster_sha256: string | null;
   source_sha256: string;
   width: number;
   height: number;
@@ -63,6 +69,7 @@ async function readAlbums(
     SELECT a.id, a.team_id, a.season_id, t.title AS team_title,
       s.title AS season_title, a.title, a.date, a.visibility, a.cover_media_id,
       m.id AS media_id, m.source_sha256, m.width, m.height, m.capture_time,
+      m.kind, m.duration, m.poster_sha256,
       json_extract(p.metadata, '$.captureTimeOriginal') AS capture_original,
       json_extract(p.metadata, '$.captureOffsetOriginal') AS capture_offset,
       m.credit, m.copyright, m.usage_terms, m.rights_url
@@ -97,8 +104,12 @@ async function readAlbums(
     }
     if (row.media_id) {
       const base = `${preview ? "/preview" : ""}/media/${row.media_id}/${row.source_sha256}`;
+      const poster = `${preview ? "/preview" : ""}/media/${row.media_id}/${row.poster_sha256}`;
       album.media.push({
         id: row.media_id,
+        kind: row.kind,
+        duration: row.duration,
+        posterUrl: row.kind === "video" ? `${poster}/viewer` : null,
         width: row.width,
         height: row.height,
         captureTime: publicCaptureTime(
@@ -110,8 +121,8 @@ async function readAlbums(
         copyright: row.copyright,
         usageTerms: row.usage_terms,
         rightsUrl: row.rights_url,
-        gridUrl: `${base}/grid`,
-        viewerUrl: `${base}/viewer`,
+        gridUrl: row.kind === "video" ? `${poster}/grid` : `${base}/grid`,
+        viewerUrl: row.kind === "video" ? `${base}/play` : `${base}/viewer`,
         downloadUrl: `${base}/download`,
       });
     }

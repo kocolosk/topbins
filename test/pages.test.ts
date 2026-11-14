@@ -14,6 +14,9 @@ const album: Album = {
   media: [
     {
       id: "photo",
+      kind: "photo",
+      duration: null,
+      posterUrl: null,
       width: 3072,
       height: 2048,
       captureTime: "2026-10-10T15:04:19-04:00",
@@ -53,7 +56,7 @@ describe("gallery rendering", () => {
     expect(html).toContain("<noscript><section");
     expect(html).toContain('src="/media/photo/version/viewer"');
     expect(html).toContain('href="/media/photo/version/download"');
-    expect(html).toContain('aria-label="Photo viewer"');
+    expect(html).toContain('aria-label="Media viewer"');
     expect(html).toContain('id="viewer-previous"');
   });
 
@@ -103,5 +106,28 @@ describe("gallery rendering", () => {
       new URL("https://example.test/albums/match"),
     );
     expect(unknown).toContain("15:04:19 (timezone unknown)");
+  });
+
+  it("renders mixed media using poster thumbnails and an on-demand native player", () => {
+    const photo = album.media[0];
+    if (!photo) throw new Error("fixture missing");
+    const video = {
+      ...photo,
+      kind: "video" as const,
+      id: "video",
+      duration: 10.2,
+      viewerUrl: "/media/video/version/play",
+      posterUrl: "/media/video/poster/viewer",
+    };
+    const html = albumPage(
+      { ...album, media: [photo, video] },
+      new URL("https://example.test/albums/match"),
+    );
+    expect(html).toContain("2 items");
+    expect(html).toContain("▶ 0:10");
+    expect(html).toContain('data-kind="video"');
+    expect(html).toContain('controls playsinline preload="none"');
+    expect(html).not.toContain('src="/media/video/version/play"');
+    expect(html).not.toContain("autoplay");
   });
 });

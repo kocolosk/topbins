@@ -1,6 +1,10 @@
-# Local photo publishing CLI
+# Local photo/video publishing CLI
 
-This is a local-only, JPEG-only publishing slice. Start the local Worker with
+For a first trial, run `mise exec -- npm run demo`: it supplies synthetic JPEGs,
+an MP4, a manifest, and isolated local storage, then prints a working gallery
+link. It requires no real media or credentials. Ctrl+C stops it.
+
+For your own exports, this is a local-only publisher. Start the local Worker with
 its publisher token configured separately, and supply the same secret in the
 CLI process environment as `TOPBINS_PUBLISH_TOKEN`. Do not put it in the
 manifest, command history, or a tracked file. Browser preview requires the
@@ -23,6 +27,11 @@ album's publication state; omission of `--publish` never implicitly unpublishes.
 Visibility is explicitly provided in the manifest. The response provides
 relative preview and album URLs; open them on the specified local origin.
 
+`./exports` and `./match.json` are example inputs, not repository fixtures.
+Create the export folder, export your JPEG/MP4 files into it, and write the
+manifest below before running the import command. A missing folder now reports
+that directly rather than suggesting a stale lock.
+
 Example manifest (all data below is synthetic):
 
 ```json
@@ -42,9 +51,42 @@ Example manifest (all data below is synthetic):
 IDs are lowercase slugs. `defaults` may also specify `copyright`, `usageTerms`,
 and an HTTP(S) `rightsUrl`; embedded rights take precedence. No permission is
 inferred. `files` is optional; without it all folder entries other than the
-manifest and state file must be JPEGs. Explicit `files` selects a subset and may
+manifest and state file must be JPEGs or MP4s. Explicit `files` selects a subset and may
 provide a UUID `id` for each photo. Files must be direct regular files, not
-symlinks. Videos and other unsupported files are errors, not silently skipped.
+symlinks. Other unsupported files are errors, not silently skipped.
+
+## Short videos
+
+Export MP4 / H.264 8-bit SDR, with AAC audio if present. HEVC, HDR, unsupported
+codecs, and multiple video/audio tracks are rejected with export guidance rather
+than silently transcoded. 1080p is recommended; compatible 4K is accepted within
+the size limit. Preserve source frame rate and audio. Sources and published
+MP4s must be **under 100,000,000 bytes**; try roughly 8 Mbps at 30 fps or 12 Mbps
+at 60 fps for a smaller web export.
+
+The importer stream-copies video/audio, strips metadata and extra data tracks,
+prepares fast start, and verifies required playback properties. A single poster
+frame is encoded locally. Example selection:
+
+```json
+{ "file": "9O0A3024.mp4", "posterTime": 1.5 }
+```
+
+Alternatively set `"poster": "cover.jpg"` to use a supplied JPEG from the same
+folder. Poster files must be regular, non-symlink JPEGs and follow the approved
+color-profile/provenance policy. The timestamp must be within the clip.
+Posters use Cloudflare image presets, not hosted Images storage.
+
+Clips are interleaved with photos by original filename. The grid loads only
+posters; opening a clip presents native controls without autoplay. Closing or
+changing items stops and releases playback. Download returns the largest
+published MP4, not a new browser-sized rendition. The original local file is
+never modified. Container creation time is used for display when present; note
+that some export tools set this to export time rather than camera capture time.
+
+The Worker streams video uploads and validates size, digest, signature, and
+publisher-declared dimensions/duration. Codec and metadata verification is the
+trusted local publisher's responsibility; the Worker does not decode videos.
 
 The ignored `.topbins-state.json` in the export folder maps names to IDs and
 source hashes; keep it with the export for reliable resume. This repository's
@@ -93,8 +135,8 @@ color-space/orientation policy.
 Asset checks and idempotent PUTs are retried for transient failures. A complete
 catalog update happens only after every selected asset is staged. Actual managed
 Images transformation behavior still requires separately approved remote
-validation before real publication. This CLI does not implement video or
-private metadata export.
+validation before real publication. This CLI does not implement a full private
+metadata export command.
 
 Sanitized files are staged on private temporary storage and uploaded one at a
 time rather than retaining an entire album in memory. If an upload or catalog
