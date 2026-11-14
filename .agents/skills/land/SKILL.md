@@ -1,211 +1,116 @@
 ---
 name: land
 description: >-
-  Land explicitly requested changes in kocolosk/topbins through verified branches
-  and pull requests, with a one-time initial repository bootstrap. Invoke only
-  when the user requests landing or merging, not for review, preparation,
-  passing checks, or skill installation.
-disable-model-invocation: true
-metadata:
-  delta-action: land
+  Publish finished changes to kocolosk/topbins through a pull request, watch its
+  checks and review comments, and merge once everything is green and resolved.
+  Use after completing a change that is meant to land, or when the user asks to
+  land or merge. Not for review-only, exploratory or unfinished work.
 ---
 
 # Land topbins changes
 
 ## Scope and authorization
 
-Apply only to the `kocolosk/topbins` repository. An explicit request to land or
-merge, including `/land`, authorizes this workflow: proceed through verification
-and landing without asking for the same permission again. Skill installation,
-review approval, or passing checks alone do not authorize landing.
+Applies only to `kocolosk/topbins`, with `origin` as the destination and `main`
+as the base. During early development the user prefers speed: finishing a
+requested change authorizes the whole flow below (push the branch, open a PR,
+address feedback, merge) without asking again. Before starting, inspect
+`origin` and confirm it still identifies that repository. If scope or
+destination is ambiguous, stop and ask.
 
-The destination is `main` on GitHub at `kocolosk/topbins`, using `origin`.
-Inspect remotes before publication and confirm that `origin` still identifies
-that repository. Also maintain a matching PR feature branch on `local`, the
-user's checkout backlink; it is not the GitHub publication destination.
-If the destination or requested scope is ambiguous, stop and ask.
+This authorizes **landing code only**. It never authorizes production
+deployment, remote migrations, Cloudflare/Zero Trust or GitHub settings changes,
+branch-protection changes, or publishing media. Those still need explicit
+approval for the specific change (see `AGENTS.md`). Merging to `main` does not
+deploy production; say so in the PR if a change needs a manual deploy or remote
+migration afterward, and leave that to the user.
 
-## Preflight
+## Prepare
 
-1. Read applicable `AGENT.md`/`AGENTS.md`, contribution policies, submission
-   templates, and relevant scripts. Honor applicable signing, authorship,
-   review, documentation, and other contribution obligations. Do not substitute
-   generated text for human-authored submission text if policy requires it.
-2. Inspect the working tree, index, current branch, history, and remote refs.
-   Account for both uncommitted changes and commits already prepared for this
-   request. Do not assume that all changed or untracked files belong to it.
-3. Review the intended diff. Stage only in-scope paths; do not use blanket
-   staging. Preserve unrelated staged and unstaged work. If that cannot be
-   done safely, stop rather than stash, reset, overwrite, or discard it.
-4. Exclude sample photos/videos and other private media unless explicitly
-   requested. Check for credentials and unintended generated files.
-5. Verify required tools and authentication without exposing credential values.
-   Use the available `git` and `gh` commands; check help before relying on
-   wrapper-specific or previously unverified arguments. Use non-interactive
-   commands. Prefix commits or merges that could open an editor with
-   `GIT_EDITOR=true` and provide explicit commit messages.
-6. Inspect current repository settings, rulesets, destination branch protection,
-   and CI requirements. GitHub API access through `gh api` was verified during
-   setup. Do not interpret a permission error or an unverifiable rule as an
-   absence of requirements.
+1. Read `AGENTS.md`. Inspect the working tree, current branch and divergence
+   from `origin/main` (`git fetch` first). Do not assume every changed or
+   untracked file belongs to this change; never stash, reset or discard
+   unrelated work.
+2. Work on a descriptively named feature branch cut from current `origin/main`
+   (never commit directly to `main`). Reuse an existing branch/PR for the same
+   change instead of opening a duplicate.
+3. Stage only in-scope paths, with no blanket `git add -A`. Exclude private
+   media, credentials, generated files and local config such as
+   `wrangler.remote.jsonc`, `.dev.vars` and `.claude/`. Scan the staged diff
+   for secrets and run `git diff --cached --check`.
+4. Run `mise run check` (the same command CI runs; see `mise.toml`) and, for
+   changes touching the CLI, media or demo, `mise exec -- npm run demo -- --smoke`.
+   Use the pinned mise tools, not ambient ones. Docs-only changes can skip the
+   full check but should still have the diff inspected.
+5. Commit with an explicit message (use `GIT_EDITOR=true` and `-m`/`-F` so no
+   editor opens) and end it with the attribution line from the session context.
 
-Useful read-only GitHub queries, supported by the inspected `gh api` interface:
+## Publish
 
-```sh
-gh api repos/kocolosk/topbins
-gh api repos/kocolosk/topbins/rulesets
-gh api repos/kocolosk/topbins/branches/main/protection
-```
+Push the branch to `origin` with a normal non-force push, then open a PR into
+`main` with `gh pr create` and an explicit title and body (no editor). The body
+states what changed, the checks actually run locally, anything not validated,
+any manual follow-up (deploy, remote migration, secret, Access/Cloudflare
+change), and the preview URL when relevant. Do not claim checks or previews that
+did not run. Never force-push or rewrite published history; add commits instead.
+After a PR head changes, earlier verification no longer applies.
 
-A missing branch is expected only when remote refs confirm that the repository
-is still empty. Never change protections, permissions, or repository settings
-to make landing succeed.
+## Watch the PR
 
-## Verification
+Poll with bounded commands (`gh pr checks`, `gh pr view --json`) or schedule a
+wake-up; do not block indefinitely. Re-check after every push.
 
-At setup, the repository contained `SPEC.md` but no application manifest,
-test/build definitions, CI workflows, or toolchain configuration. Do not invent
-commands such as `mise run test`, or claim application tests passed when none
-exist.
+- **Failing checks.** Read the logs (`gh run view --log-failed`), fix the cause,
+  push, and wait again. Do not disable, skip or weaken a check, or merge around
+  a failure. If a failure is flaky or external and not caused by the change,
+  rerun once and report it. If you cannot fix it, stop and tell the user.
+- **Review comments.** Read all inline comments and reviews (`gh api
+  repos/kocolosk/topbins/pulls/<n>/comments` and `/reviews`), including
+  Copilot's, and decide on the merits: fix valid findings with a regression test
+  where sensible; reply with a short reason when declining. Resolve each thread
+  once addressed or answered. A human reviewer's change request is not dismissed
+  by the agent: fix it or ask the user.
+- **Cloudflare preview.** The Workers Builds check deploys a branch preview
+  (`docs/pr-previews.md`). It must succeed for the current head. Previews use
+  empty shared staging storage with publishing and draft preview disabled, so
+  say plainly what a preview can and cannot exercise.
 
-- For documentation/setup-only changes while no verification tasks exist,
-  inspect the full staged diff and run `git diff --cached --check`. Validate
-  changed structured configuration, including skill frontmatter, with available
-  suitable tooling. Report absent checks plainly.
-- As implementation is added, inspect actual manifests, task definitions, and
-  CI workflows before selecting commands. Record a repository-relative source
-  reference establishing each exact project-specific invocation in the landing
-  report. Prefer configured, pinned `mise` tools; do not silently substitute
-  ambient tool versions. Follow the toolchain preference in `SPEC.md`,
-  section 8, "Local tooling."
-- Keep local verification proportional to the change unless repository policy
-  requires more. A representative local run does not replace required CI.
-- Verify that **all required checks have passed for the exact changes being
-  landed**, including applicable PR-head or merge-candidate checks. Pending,
-  failing, missing, stale, or unverifiable required checks block landing.
-- Any modification or conflict resolution invalidates affected verification;
-  rerun it and wait for fresh required results.
+## Preview notification vs. merging
 
-## One-time empty-repository bootstrap
+Decide whether the change has a **meaningful preview**: user-visible gallery,
+page, viewer, styling or public-route behavior a person can try in the browser.
+Docs, tests, tooling/CI, dependency bumps, and API/CLI/auth changes that a
+preview cannot exercise are not meaningful previews.
 
-Use this exception only when both local history and remote refs establish that
-the repository has no commits. If remote history now exists, use the ordinary
-pull-request path instead.
+- **Meaningful preview:** once checks pass and comments are resolved, tell the
+  user the preview URL, what to try, and what the preview cannot show. Do not
+  merge until they say it is good.
+- **Otherwise:** merge as soon as all checks pass for the current head and all
+  review threads are resolved.
 
-1. Limit bootstrap to the requested initial documentation/setup changes.
-   Application changes are not covered by this direct-push exception.
-2. Complete applicable verification, including staged-diff review and checks.
-3. Create an initial commit on `main`, with an explicit descriptive message,
-   respecting configured signing requirements.
-4. Recheck remote refs immediately before pushing. If another actor has
-   initialized the repository, stop; do not overwrite or force-push.
-5. Push `main` to `origin` with a normal non-force push and verify the resulting
-   remote commit. If rules prohibit bootstrap publication, report the blocker
-   rather than bypassing them.
+## Merge
 
-Once `main` exists, do not use this exception again.
+1. Re-fetch and confirm the head SHA you verified is the PR head, all required
+   checks passed for that exact head, and no unresolved threads remain.
+2. Squash-merge pinned to that head:
+   `gh pr merge <n> --squash --match-head-commit <sha>`. Check `gh pr merge
+   --help` for current flags; use a different strategy only if repository rules
+   require one. Never use administrative bypass, and never change protections or
+   settings to make a merge succeed. `main` is currently unprotected, so CI
+   passing is the gate by convention.
+3. Verify the PR shows `MERGED` and the merge commit is reachable from
+   `origin/main`.
+4. If the user's checkout is on a clean `main` or on the merged feature branch
+   with nothing uncommitted, fast-forward it (`git merge --ff-only`); otherwise
+   leave it alone and say so. Do not delete the user's branches.
 
-## Ordinary branch and pull-request landing
+## Stop and ask
 
-1. Fetch the destination and inspect divergence and the intended commit range.
-   Preserve unrelated work and do not rewrite published history.
-2. Prepare a descriptive feature branch containing only the requested changes.
-   Reuse an existing appropriate branch/PR rather than creating duplicates.
-   Make any necessary commits with explicit messages after verification.
-3. Publish the same feature branch and commit to both `local` and `origin`
-   using normal, non-force pushes, following the local synchronization rules
-   below. Then create or update its pull request targeting `main` in
-   `kocolosk/topbins`. Check the installed
-   CLI's supported flags before execution; do not assume every upstream
-   subcommand is implemented by a local wrapper. Use explicit title/body text,
-   respecting submission policy and templates, rather than an interactive editor.
-4. Summarize the change, actual verification, and any applicable preview URL in
-   the PR. Do not claim tests or previews that did not run.
-5. Reconcile with destination updates only through a non-destructive workflow.
-   If integration introduces any conflict, follow the conflict policy below.
-6. Obtain applicable required reviews and verify all required CI results for
-   the current changes. If they are pending, wait with bounded commands or
-   report that landing remains pending; do not treat PR creation as completion.
-7. Squash-merge the verified PR when allowed by current rules, pinning the
-   operation to the verified head where the API/tool supports it. Check the
-   head again before merging. If current rules require a different merge
-   strategy or a merge queue, follow that requirement and verify its required
-   checks rather than bypassing it.
-8. Verify that the PR is merged and its resulting commit is reachable from
-   remote `main`. A published branch, approved PR, queued merge, or enabled
-   auto-merge is not successful landing.
-
-Never force-push, disable checks, override protections, use administrative bypass,
-or merge a stale version whose required checks do not apply.
-
-## Local feature-branch synchronization
-
-- Inspect `local` before publishing and confirm that it is the expected source
-  repository. Stop if it is missing or points somewhere unexpected.
-- Each PR must have a same-named feature branch on `local` at the same commit
-  as its branch on `origin`. Use explicit branch refspecs; never push all refs,
-  tags, or a mirror of the repository.
-- Push the feature branch to `local` before publishing/updating it on `origin`.
-  After every PR-head update, synchronize both branches and verify their hashes
-  with `git ls-remote` before proceeding to merge.
-- Only create a missing branch or fast-forward an existing branch. If the local
-  branch has diverged, stop and report it; do not force-push or discard commits.
-- Do not update a branch checked out in the source repository or any of its
-  worktrees. If the requested branch is checked out, pause for the user rather
-  than changing checkout state or Git receive settings.
-- Keep the local feature branch after merge, even if GitHub deletes its copy.
-  After a squash merge it retains the final PR-head commit, not the squash
-  commit. Do not rewrite it to the destination commit.
-- This synchronization does not advance the user's checked-out `main` or modify
-  files in their primary checkout. Updating that checkout is a separate explicit
-  operation, not an implicit part of landing.
-- A push to one remote can succeed while the other fails. Report both states
-  precisely and retry only safe non-force updates; do not merge while required
-  feature-branch synchronization remains incomplete.
-
-## Cloudflare previews
-
-Cloudflare branch previews are intended but were not configured at skill setup.
-Do not invent a deployment command, configure infrastructure, or require a
-nonexistent preview for the documentation-only bootstrap.
-
-Once preview integration exists:
-
-- Inspect its actual configuration and determine which checks/deployments
-  correspond to the PR head.
-- For application changes, obtain the branch preview URL, include it in the PR,
-  and verify that the deployment succeeds for those changes before merging.
-- Validate relevant behavior through the preview when feasible; report any
-  access or testing limitation. A successful deployment alone is not proof that
-  the application behaves correctly.
-- Respect documented docs-only exemptions.
-- Stop if an applicable required preview fails, is missing, or cannot be
-  verified. Do not replace it with an older deployment or a production URL.
-
-Landing does not independently authorize manual production deployment, gallery
-publication, media upload, or infrastructure mutations. A configured automatic
-deployment resulting from merge follows the repository's normal integration.
-
-## Conflicts and safeguards
-
-The user's explicit preference is to **pause on every merge conflict**.
-
-Do not resolve even apparently straightforward conflicts automatically. Report
-the operation, conflicting paths, and why the changes have not landed, then wait
-for the user's decision. Preserve unrelated work and explain any in-progress
-Git operation; do not perform destructive cleanup.
-
-Also stop for ambiguous scope, unavailable permissions, unsafe changes, unmet
-contribution requirements, or failed/unverifiable required checks.
-
-## Completion
-
-Report the destination branch, resulting commit, PR URL when applicable, checks
-actually run, the synchronized local feature branch, and any remaining
-limitations. Verify the remote destination, not merely the local branch.
-Do not claim success unless the requested changes
-are landed. On a blocker, explicitly state that they have not landed and
-identify the action needed to proceed.
-
-Leave unrelated work untouched and do not delete branches or alter the user's
-primary checkout as implicit cleanup.
+Pause, report, and wait for the user when: the base moves and integrating causes
+**any merge conflict** (do not resolve even simple conflicts automatically;
+report the paths and the in-progress state, and preserve unrelated work); a
+required check fails and you cannot fix it; scope is ambiguous; a change would
+need approval-gated infrastructure, secrets, or media work; or something unsafe
+or unverifiable appears. A PR that has been created is not a landed change:
+report truthfully whether it is merged, waiting on checks, or waiting on the
+user.
