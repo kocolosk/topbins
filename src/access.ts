@@ -19,10 +19,13 @@ const refreshIntervalMs = 60 * 1000;
 
 type Mode = "access" | "token";
 
-// Any Access setting selects Access mode, even if incomplete: a half-configured
-// production Worker must fail closed rather than fall back to a shared token.
+// Any defined Access setting selects Access mode, even if empty or incomplete:
+// a half-configured production Worker must fail closed rather than fall back to
+// a shared token. Value validation happens in verifyAccessJwt.
 export function authMode(env: AuthEnv): Mode {
-  return env.ACCESS_TEAM_DOMAIN || env.ACCESS_AUD ? "access" : "token";
+  return env.ACCESS_TEAM_DOMAIN !== undefined || env.ACCESS_AUD !== undefined
+    ? "access"
+    : "token";
 }
 
 interface KeySet {

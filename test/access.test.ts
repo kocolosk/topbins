@@ -169,6 +169,8 @@ describe("Cloudflare Access authentication", () => {
       { ...env, PUBLISH_TOKEN: "synthetic-token", ACCESS_TEAM_DOMAIN: domain },
       { ...env, PUBLISH_TOKEN: "synthetic-token", ACCESS_AUD: aud },
       { ...accessEnv, ACCESS_TEAM_DOMAIN: "evil.test" },
+      { ...env, PUBLISH_TOKEN: "synthetic-token", ACCESS_TEAM_DOMAIN: "" },
+      { ...env, PUBLISH_TOKEN: "synthetic-token", ACCESS_AUD: "" },
     ])
       expect((await publisherCall(headers, partial)).status).toBe(401);
   });
