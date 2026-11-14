@@ -186,7 +186,7 @@ Remaining work under the spec:
 - A real HTTPS import through Cloudflare Access (the application, service token and
   Worker verifier are deployed and verified; see [Access](docs/access.md)), launch
   policies, and real managed Images validation.
-- Approval of additional embedded ICC profiles before importing exports that
+- Approval of any further embedded ICC profiles before importing exports that
   contain them. Unknown profiles fail closed rather than leak embedded text or
   change colors by assigning another profile.
 - Explicit deletion/unpublishing UX, complete catalog/asset backup and recovery,
