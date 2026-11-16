@@ -1,4 +1,51 @@
 (() => {
+  // Justified rows (see style.css) leave the last row at its base height, which
+  // is shorter than the stretched rows above it. Size it to match the previous
+  // row, shrinking only if it would not fit. CSSOM styles are CSP-safe.
+  const grid = document.querySelector(".photo-grid");
+  if (!grid) return;
+  const figures = [...grid.children].filter((el) => el.tagName === "FIGURE");
+
+  function balanceLastRow() {
+    for (const figure of figures) {
+      figure.style.removeProperty("flex");
+      figure.style.removeProperty("width");
+    }
+    // One column on narrow screens: every figure is its own row.
+    if (figures.length < 2 || matchMedia("(max-width: 42rem)").matches) return;
+    const tops = figures.map((figure) => figure.offsetTop);
+    const lastTop = Math.max(...tops);
+    const last = figures.filter((_, i) => tops[i] === lastTop);
+    const previous = figures.filter((_, i) => tops[i] < lastTop);
+    const reference = previous.at(-1)?.querySelector("img");
+    if (!reference || last.length === figures.length) return;
+    const height = reference.getBoundingClientRect().height;
+    const widths = last.map((figure) => {
+      const img = figure.querySelector("img");
+      return (
+        (height * Number(img.getAttribute("width"))) /
+        Number(img.getAttribute("height"))
+      );
+    });
+    const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+    const available = grid.clientWidth - gap * (last.length - 1);
+    const scale = Math.min(1, available / widths.reduce((a, b) => a + b, 0));
+    last.forEach((figure, i) => {
+      figure.style.flex = "none";
+      figure.style.width = `${widths[i] * scale}px`;
+    });
+  }
+
+  let frame = 0;
+  const schedule = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(balanceLastRow);
+  };
+  schedule();
+  addEventListener("resize", schedule);
+})();
+
+(() => {
   const dialog = document.querySelector("#viewer");
   if (!(dialog instanceof HTMLDialogElement)) return;
   const photos = [...document.querySelectorAll(".photo-link")];
