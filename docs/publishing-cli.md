@@ -114,8 +114,14 @@ album order, even when timestamps tie or disagree. Stable media IDs break ties.
 Filenames remain private. The CLI warns when an offset or timestamp is missing.
 IPTC/XMP keyword originals are included only in authenticated private
 metadata; they are not included in sanitized source files. ExifTool removes
-metadata and restores only capture fields, orientation, color profile/color space, and
-approved rights, without recompressing pixels. Input and output must be below 20,000,000
+metadata and restores only capture fields, orientation, color profile/color space,
+approved rights, and camera/exposure details (make, model, lens, focal length,
+aperture, shutter, ISO, exposure program/mode/compensation, metering, flash, white
+balance), without recompressing pixels. Camera and lens serial numbers, owner
+names, GPS, keywords, thumbnails, maker notes and edit history are never kept.
+The same camera details are recorded in private metadata (`camera`) so a future
+gallery view needs no re-import. Existing albums need `--replace` to pick the
+new fields up, because the sanitized bytes change. Input and output must be below 20,000,000
 bytes; dimensions must not exceed 12,000 pixels per side or 100 megapixels.
 Temporary copies are removed on normal completion or failure; abrupt process
 termination may leave OS temporary files, so use an appropriately private

@@ -16,7 +16,12 @@ import { join, resolve } from "node:path";
 import { parseManifest, validateRightsUrl } from "./manifest.ts";
 import type { Rights } from "./manifest.ts";
 import { validateColorProfile } from "./color-profiles.ts";
-import { classify, digitalSourceType, hasJumbfSegment } from "./provenance.ts";
+import {
+  cameraTags,
+  classify,
+  digitalSourceType,
+  hasJumbfSegment,
+} from "./provenance.ts";
 import { prepareVideo, VIDEO_LIMIT } from "./video.ts";
 
 type Metadata = Record<string, unknown>;
@@ -540,6 +545,12 @@ async function performImport(
         console.warn(
           `${name}: capture time or timezone missing/invalid; no timezone will be inferred`,
         );
+      // Not displayed yet; recorded so a camera-details view needs no re-import.
+      privateMetadata.camera = Object.fromEntries(
+        cameraTags
+          .filter((tag) => metadata[tag] !== undefined)
+          .map((tag) => [tag.split(":")[1], metadata[tag]]),
+      );
       privateMetadata.captureTimeOriginal = capture ?? null;
       privateMetadata.captureOffsetOriginal = offset ?? null;
       privateMetadata.rightsOriginal = Object.fromEntries(
@@ -562,6 +573,7 @@ async function performImport(
         "-ExifIFD:DateTimeOriginal",
         "-ExifIFD:OffsetTimeOriginal",
         "-ExifIFD:SubSecTimeOriginal",
+        ...cameraTags.map((tag) => `-${tag}`),
       ];
       if (approved.credit) args.push(`-XMP-dc:Creator=${approved.credit}`);
       if (approved.copyright) args.push(`-XMP-dc:Rights=${approved.copyright}`);
@@ -583,7 +595,9 @@ async function performImport(
       const allowed =
         /^(SourceFile|ExifTool:|System:|File:|JPEG:|JFIF:|Composite:|ICC_Profile:|ICC-header:|ICC-view:|ICC-meas:|Adobe:(DCTEncodeVersion|APP14Flags0|APP14Flags1|ColorTransform)$|IFD0:Orientation$|IFD0:YCbCrPositioning$|ExifIFD:(ColorSpace|ExifVersion|ComponentsConfiguration|DateTimeOriginal|OffsetTimeOriginal|SubSecTimeOriginal)$|XMP-x:XMPToolkit$|XMP-iptcExt:DigitalSourceType$|XMP-dc:Creator$|XMP-dc:Rights$|XMP-xmpRights:UsageTerms$|XMP-xmpRights:WebStatement$)/;
       const unexpected = Object.keys(verified).filter(
-        (key) => !allowed.test(key),
+        (key) =>
+          !allowed.test(key) &&
+          !(cameraTags as readonly string[]).includes(key),
       );
       if (unexpected.length)
         throw new Error(
