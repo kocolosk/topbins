@@ -15,3 +15,5 @@ examples/
 .topbins-state.json
 .topbins-state.json.lock
 .topbins-state.json.*.tmp
+test-results/
+playwright-report/

@@ -68,6 +68,8 @@ Do not rely on a globally installed Wrangler or media tool.
 | `mise run dev` | Wrangler local Worker, assets, D1, R2 and offline Images simulation |
 | `mise exec -- npm run demo` | Generate/import synthetic mixed media and keep the demo server running on port 8790 |
 | `mise exec -- npm run demo -- --smoke` | Run the isolated end-to-end demo checks and stop |
+| `mise exec -- npm run test:browser:install` | One-time download of Playwright's Chromium, Firefox and WebKit |
+| `mise run test:browser` | Run the browser tests against the synthetic demo (not part of `check`) |
 | `mise exec -- npm run db:migrate` | Apply migrations to local D1; may ask for confirmation |
 | `mise exec -- npm test` | Worker-runtime integration tests and Node CLI tests |
 | `mise exec -- npm run typecheck` | Strict Worker and separate Node CLI TypeScript checks |
@@ -90,6 +92,26 @@ Local state lives in ignored `.wrangler/state/`; Vitest uses isolated ephemeral
 storage and does not reuse that development state. The baseline migration is
 intentionally a no-op; subsequent migrations add the catalog and team-scoped
 seasons. Add forward-only numbered migrations; do not edit applied migrations.
+
+## Browser tests
+
+`e2e/gallery.spec.ts` drives the gallery and viewer in real Chromium, Firefox and
+WebKit with Playwright: the last justified row matching the row above, the
+single-column mobile layout, viewer open/arrow keys/Escape with the `?photo=`
+URL, neighbour prefetch, and no console errors, CSP violations or 4xx/5xx
+responses. Tests use auto-waiting rather than sleeps.
+
+```sh
+mise exec -- npm run test:browser:install   # once; browsers live in Playwright's cache, outside mise
+mise run test:browser
+```
+
+Playwright starts `npm run demo` itself (or reuses one already on port 8790), so
+only the synthetic demo media is involved and nothing touches a deployed site.
+Run one browser with `mise exec -- npx playwright test --project chromium`; after
+a failure, `mise exec -- npx playwright show-report` opens the HTML report. The
+tests are separate from `mise run check` and vitest. WebKit and Firefox on Linux
+may need system libraries (`playwright install --with-deps`).
 
 ## Import and preview a match locally
 

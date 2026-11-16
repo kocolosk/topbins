@@ -17,3 +17,7 @@ run = "npm run dev"
 [tasks.check]
 description = "Run all offline scaffold checks"
 run = "npm run check"
+
+[tasks."test:browser"]
+description = "Run Playwright browser tests against the synthetic local demo (not part of check)"
+run = "npm run test:browser"
