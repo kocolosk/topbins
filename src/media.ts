@@ -88,39 +88,45 @@ export async function serveMedia(
     result.headers.set("Vary", "Accept");
     return result;
   }
-  const object = await env.MEDIA.get(`sources/${match[2]}.jpg`);
-  if (!object) return response("Not found", 404);
-  try {
-    const size = match[3] === "grid" ? 640 : 2560;
-    const transformed = (
-      await env.IMAGES.input(object.body)
-        .transform({ width: size, height: size, fit: "scale-down" })
-        .output({
-          format,
-          quality: quality[format],
-        })
-    ).response();
-    if (!transformed.ok) return response("Image transformation failed", 502);
-    // Label by what was actually produced, never by what was requested.
-    const actual = transformed.headers.get("Content-Type")?.split(";")[0];
-    if (actual !== format) return response("Image transformation failed", 502);
-    const result = response(
-      request.method === "HEAD" ? null : transformed.body,
-      200,
-      format,
-    );
-    result.headers.set("Vary", "Accept");
-    if (!preview) {
-      const cacheEntry = new Response(result.clone().body, {
-        headers: {
-          "Content-Type": format,
-          "Cache-Control": "public, max-age=86400",
-        },
-      });
-      await caches.default.put(cacheKey, cacheEntry);
+  const size = match[3] === "grid" ? 640 : 2560;
+  // The binding fails transiently under bursts of concurrent transforms, so
+  // retry (up to three attempts) with a fresh source stream. Only error names/codes are logged.
+  let transformed: Response | undefined;
+  for (let attempt = 0; attempt < 3 && !transformed; attempt++) {
+    const object = await env.MEDIA.get(`sources/${match[2]}.jpg`);
+    if (!object) return response("Not found", 404);
+    try {
+      const candidate = (
+        await env.IMAGES.input(object.body)
+          .transform({ width: size, height: size, fit: "scale-down" })
+          .output({ format, quality: quality[format] })
+      ).response();
+      // Label by what was actually produced, never by what was requested.
+      const actual = candidate.headers.get("Content-Type")?.split(";")[0];
+      if (candidate.ok && actual === format) transformed = candidate;
+      else console.error("images: unexpected result", candidate.status, actual);
+    } catch (error) {
+      const code = (error as { code?: unknown }).code;
+      console.error("images: transform failed", attempt, code, String(error));
     }
-    return result;
-  } catch {
-    return response("Image transformation failed", 502);
+    if (!transformed && attempt < 2)
+      await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt));
   }
+  if (!transformed) return response("Image transformation failed", 502);
+  const result = response(
+    request.method === "HEAD" ? null : transformed.body,
+    200,
+    format,
+  );
+  result.headers.set("Vary", "Accept");
+  if (!preview) {
+    const cacheEntry = new Response(result.clone().body, {
+      headers: {
+        "Content-Type": format,
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+    await caches.default.put(cacheKey, cacheEntry);
+  }
+  return result;
 }
