@@ -99,6 +99,13 @@ export function seasonPage(
   );
 }
 
+// Rows of the gallery are justified by aspect ratio. The CSP forbids inline
+// styles, so the ratio is bucketed (tenths, 0.4 to 3.0) into a class.
+function aspectBucket(photo: Photo): number {
+  const ratio = photo.width / photo.height;
+  return Math.min(30, Math.max(4, Math.round(ratio * 10)));
+}
+
 function photoTime(photo: Photo): string {
   const value = photo.captureTime;
   if (!value) return "";
@@ -153,7 +160,7 @@ ${chosen ? `<noscript><section class="selected-photo">${chosen.kind === "video" 
 <div class="photo-grid" aria-label="Match photos">${album.media
       .map(
         (photo, index) =>
-          `<figure><a class="photo-link" href="${escapeHtml(photoHref(photo))}" data-photo-id="${escapeHtml(photo.id)}" data-kind="${photo.kind}" data-poster="${escapeHtml(photo.posterUrl ?? photo.gridUrl)}" data-viewer="${escapeHtml(photo.viewerUrl)}" data-download="${escapeHtml(photo.downloadUrl)}" aria-label="Open ${photo.kind === "video" ? "video" : "photo"} ${index + 1} of ${album.media.length}"><img src="${escapeHtml(photo.gridUrl)}" width="${photo.width}" height="${photo.height}" alt="${photo.kind === "video" ? "Video poster" : "Match photo"} ${index + 1}" loading="lazy" decoding="async">${photo.kind === "video" ? `<span class="video-badge">▶ ${duration(photo.duration)}</span>` : ""}</a>${photoTime(photo)}<figcaption class="photo-rights" hidden>${rights(photo)}</figcaption></figure>`,
+          `<figure class="ar-${aspectBucket(photo)}"><a class="photo-link" href="${escapeHtml(photoHref(photo))}" data-photo-id="${escapeHtml(photo.id)}" data-kind="${photo.kind}" data-poster="${escapeHtml(photo.posterUrl ?? photo.gridUrl)}" data-viewer="${escapeHtml(photo.viewerUrl)}" data-download="${escapeHtml(photo.downloadUrl)}" aria-label="Open ${photo.kind === "video" ? "video" : "photo"} ${index + 1} of ${album.media.length}"><img src="${escapeHtml(photo.gridUrl)}" width="${photo.width}" height="${photo.height}" alt="${photo.kind === "video" ? "Video poster" : "Match photo"} ${index + 1}" loading="lazy" decoding="async">${photo.kind === "video" ? `<span class="video-badge">▶ ${duration(photo.duration)}</span>` : ""}</a><figcaption class="photo-rights" hidden>${rights(photo)}</figcaption></figure>`,
       )
       .join("")}</div>
 <dialog id="viewer" aria-label="Media viewer"><div class="viewer-shell"><div class="viewer-toolbar"><span id="viewer-position" aria-live="polite"></span><button id="viewer-close" type="button" aria-label="Close media viewer">Close <span aria-hidden="true">×</span></button></div><div class="viewer-stage"><button id="viewer-previous" class="viewer-step" type="button" aria-label="Previous item">‹</button><img id="viewer-image" alt=""><video id="viewer-video" controls playsinline preload="none" hidden></video><button id="viewer-next" class="viewer-step" type="button" aria-label="Next item">›</button></div><div class="viewer-details"><div id="viewer-rights" class="rights"></div><div class="viewer-actions"><button id="viewer-share" type="button">Copy link</button><a id="viewer-download" class="button" download>Download</a></div></div><p id="viewer-status" class="visually-hidden" role="status"></p></div></dialog>`,
