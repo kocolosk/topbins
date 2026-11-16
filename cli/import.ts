@@ -16,6 +16,7 @@ import { join, resolve } from "node:path";
 import { parseManifest, validateRightsUrl } from "./manifest.ts";
 import type { Rights } from "./manifest.ts";
 import { validateColorProfile } from "./color-profiles.ts";
+import { classify, digitalSourceType, hasJumbfSegment } from "./provenance.ts";
 import { prepareVideo, VIDEO_LIMIT } from "./video.ts";
 
 type Metadata = Record<string, unknown>;
@@ -46,6 +47,17 @@ function probe(path: string): Metadata {
   )
     throw new Error("ExifTool reported invalid or unsupported metadata");
   return result[0];
+}
+
+// DigitalSourceType declarations inside a C2PA manifest (needs the deep JUMBF
+// parse that the default probe does not request).
+function c2paSourceTypes(path: string): unknown {
+  const result = JSON.parse(
+    tool(["-j", "-G1", "-a", "-api", "RequestAll=3", "-CBOR:all", path]),
+  ) as Metadata[];
+  return Object.entries(result[0] ?? {})
+    .filter(([key]) => /DigitalSourceType$/.test(key))
+    .map(([, v]) => v);
 }
 
 function colorProfile(path: string): Buffer {
@@ -468,16 +480,21 @@ async function performImport(
         throw new Error(`${name}: not a JPEG`);
       const originalProfile = colorProfile(source);
       validateColorProfile(originalProfile);
-      // C2PA manifests are embedded in JPEG APP11 JUMBF boxes. Refuse them before stripping.
-      if (
+      // C2PA manifests (JPEG APP11 JUMBF) cannot survive sanitization, so they
+      // are stripped with the rest of the metadata; keep only the declared AI
+      // disclosure (see provenance.ts).
+      const hasCredentials =
         bytes.includes(Buffer.from("c2pa", "ascii")) ||
         bytes.includes(Buffer.from("jumb", "ascii")) ||
-        Object.keys(metadata).some((key) => /c2pa|jumbf/i.test(key))
-      ) {
-        throw new Error(
-          `${name}: Content Credentials/JUMBF detected; evaluate provenance before importing`,
+        Object.keys(metadata).some((key) => /c2pa|jumbf/i.test(key));
+      const aiDisclosure = classify(
+        metadata["XMP-iptcExt:DigitalSourceType"],
+        hasCredentials ? c2paSourceTypes(source) : [],
+      );
+      if (hasCredentials)
+        console.warn(
+          `${name}: Content Credentials removed (they cannot survive sanitization)${aiDisclosure ? `; recording ${aiDisclosure} disclosure` : ""}`,
         );
-      }
       const width = Number(metadata["File:ImageWidth"]);
       const height = Number(metadata["File:ImageHeight"]);
       if (
@@ -552,13 +569,19 @@ async function performImport(
         args.push(`-XMP-xmpRights:UsageTerms=${approved.usageTerms}`);
       if (approved.rightsUrl)
         args.push(`-XMP-xmpRights:WebStatement=${approved.rightsUrl}`);
+      if (aiDisclosure)
+        args.push(
+          `-XMP-iptcExt:DigitalSourceType=${digitalSourceType[aiDisclosure]}`,
+        );
       tool([...args, output]);
       const sanitized = await readFile(output);
+      if (hasJumbfSegment(sanitized))
+        throw new Error(`${name}: Content Credentials were not removed`);
       if (sanitized.length >= 20_000_000)
         throw new Error(`${name}: sanitized file must be under 20 MB`);
       const verified = probe(output);
       const allowed =
-        /^(SourceFile|ExifTool:|System:|File:|JPEG:|JFIF:|Composite:|ICC_Profile:|ICC-header:|ICC-view:|ICC-meas:|Adobe:(DCTEncodeVersion|APP14Flags0|APP14Flags1|ColorTransform)$|IFD0:Orientation$|IFD0:YCbCrPositioning$|ExifIFD:(ColorSpace|ExifVersion|ComponentsConfiguration|DateTimeOriginal|OffsetTimeOriginal|SubSecTimeOriginal)$|XMP-x:XMPToolkit$|XMP-dc:Creator$|XMP-dc:Rights$|XMP-xmpRights:UsageTerms$|XMP-xmpRights:WebStatement$)/;
+        /^(SourceFile|ExifTool:|System:|File:|JPEG:|JFIF:|Composite:|ICC_Profile:|ICC-header:|ICC-view:|ICC-meas:|Adobe:(DCTEncodeVersion|APP14Flags0|APP14Flags1|ColorTransform)$|IFD0:Orientation$|IFD0:YCbCrPositioning$|ExifIFD:(ColorSpace|ExifVersion|ComponentsConfiguration|DateTimeOriginal|OffsetTimeOriginal|SubSecTimeOriginal)$|XMP-x:XMPToolkit$|XMP-iptcExt:DigitalSourceType$|XMP-dc:Creator$|XMP-dc:Rights$|XMP-xmpRights:UsageTerms$|XMP-xmpRights:WebStatement$)/;
       const unexpected = Object.keys(verified).filter(
         (key) => !allowed.test(key),
       );
@@ -597,6 +620,7 @@ async function performImport(
         height: orientation >= 5 ? width : height,
         captureTime,
         ...approved,
+        aiDisclosure,
         privateMetadata,
         ...(replace ? { replace: true } : {}),
       });

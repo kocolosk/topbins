@@ -19,6 +19,7 @@
     "../test/cli.test.ts",
     "../test/credentials.test.ts",
     "../test/preview.test.ts",
+    "../test/provenance.test.ts",
     "../test/video.test.ts",
     "../vitest.config.ts"
   ]

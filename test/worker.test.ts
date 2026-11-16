@@ -431,6 +431,33 @@ describe("publisher and visibility", () => {
     expect((await write("draft")).status).toBe(200);
     expect((await call(imageUrl)).status).toBe(404);
   });
+  it("stores and publicly discloses AI editing, rejecting unknown values", async () => {
+    await env.MEDIA.put(
+      `sources/${sha}.jpg`,
+      new Uint8Array([255, 216, 255, 217]),
+      { customMetadata: { width: "100", height: "80" } },
+    );
+    const withAi = (aiDisclosure: unknown) => ({
+      ...album,
+      state: "published",
+      media: [{ ...media, aiDisclosure }],
+    });
+    expect((await put(withAi("<b>x</b>"))).status).toBe(400);
+    expect((await put(withAi("ai-edited"))).status).toBe(200);
+    const pub = (await (await call("/api/albums/match")).json()) as {
+      album: { media: { aiDisclosure: string | null }[] };
+    };
+    expect(pub.album.media[0]?.aiDisclosure).toBe("ai-edited");
+    const exported = (await (
+      await call("/api/publisher/albums/match")
+    ).json()) as { media: { aiDisclosure: string | null }[] };
+    expect(exported.media[0]?.aiDisclosure).toBe("ai-edited");
+    const page = await (await call("/albums/match")).text();
+    expect(page).toContain("Edited with generative AI");
+    expect((await put(withAi(null))).status).toBe(200);
+    const cleared = await (await call("/albums/match")).text();
+    expect(cleared).not.toContain("generative AI");
+  });
   it("gates drafts, publishes public and unlisted without private metadata, and retains media", async () => {
     await env.MEDIA.put(
       `sources/${sha}.jpg`,

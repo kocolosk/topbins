@@ -17,6 +17,7 @@ const album: Album = {
       kind: "photo",
       duration: null,
       posterUrl: null,
+      aiDisclosure: null,
       width: 3072,
       height: 2048,
       captureTime: "2026-10-10T15:04:19-04:00",

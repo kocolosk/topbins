@@ -30,6 +30,7 @@ export default defineConfig({
           include: [
             "test/cli.test.ts",
             "test/credentials.test.ts",
+            "test/provenance.test.ts",
             "test/video.test.ts",
             "test/pages.test.ts",
             "test/preview.test.ts",
