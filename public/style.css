@@ -169,17 +169,103 @@ p {
   background: var(--mist);
 }
 .photo-grid {
-  columns: 3 18rem;
-  column-gap: 0.75rem;
+  --row: 15rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
+/* Justified rows: photos flow left to right, then down; each grows in
+   proportion to its aspect ratio so rows end up one height. */
 .photo-grid figure {
-  break-inside: avoid;
-  margin: 0 0 0.75rem;
+  --ar: 1.5;
+  flex: calc(var(--ar) * 100) 1 calc(var(--ar) * var(--row));
+  margin: 0;
 }
-.photo-grid .capture-time {
-  color: var(--muted);
-  font-size: 0.8rem;
-  margin: 0.4rem 0 0.8rem;
+/* Keeps the last, incomplete row from stretching. */
+.photo-grid::after {
+  content: "";
+  flex-grow: 1000000;
+}
+.photo-grid .ar-4 {
+  --ar: 0.4;
+}
+.photo-grid .ar-5 {
+  --ar: 0.5;
+}
+.photo-grid .ar-6 {
+  --ar: 0.6;
+}
+.photo-grid .ar-7 {
+  --ar: 0.7;
+}
+.photo-grid .ar-8 {
+  --ar: 0.8;
+}
+.photo-grid .ar-9 {
+  --ar: 0.9;
+}
+.photo-grid .ar-10 {
+  --ar: 1;
+}
+.photo-grid .ar-11 {
+  --ar: 1.1;
+}
+.photo-grid .ar-12 {
+  --ar: 1.2;
+}
+.photo-grid .ar-13 {
+  --ar: 1.3;
+}
+.photo-grid .ar-14 {
+  --ar: 1.4;
+}
+.photo-grid .ar-15 {
+  --ar: 1.5;
+}
+.photo-grid .ar-16 {
+  --ar: 1.6;
+}
+.photo-grid .ar-17 {
+  --ar: 1.7;
+}
+.photo-grid .ar-18 {
+  --ar: 1.8;
+}
+.photo-grid .ar-19 {
+  --ar: 1.9;
+}
+.photo-grid .ar-20 {
+  --ar: 2;
+}
+.photo-grid .ar-21 {
+  --ar: 2.1;
+}
+.photo-grid .ar-22 {
+  --ar: 2.2;
+}
+.photo-grid .ar-23 {
+  --ar: 2.3;
+}
+.photo-grid .ar-24 {
+  --ar: 2.4;
+}
+.photo-grid .ar-25 {
+  --ar: 2.5;
+}
+.photo-grid .ar-26 {
+  --ar: 2.6;
+}
+.photo-grid .ar-27 {
+  --ar: 2.7;
+}
+.photo-grid .ar-28 {
+  --ar: 2.8;
+}
+.photo-grid .ar-29 {
+  --ar: 2.9;
+}
+.photo-grid .ar-30 {
+  --ar: 3;
 }
 .photo-link {
   display: block;
@@ -264,7 +350,7 @@ p {
   background: #14222d;
 }
 .viewer-shell {
-  min-height: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -289,21 +375,20 @@ p {
   flex: 1;
   display: grid;
   grid-template-columns: 3rem minmax(0, 1fr) 3rem;
+  grid-template-rows: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
-  min-height: 10rem;
+  min-height: 0;
 }
-#viewer-image {
-  display: block;
-  max-width: 100%;
-  max-height: 73vh;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-}
+/* Fill the space between toolbar and details; the 2560 px image has the
+   resolution for it. */
+#viewer-image,
 #viewer-video {
-  max-width: 100%;
-  max-height: 73vh;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
 }
 #viewer-image[hidden],
 #viewer-video[hidden] {
@@ -376,11 +461,13 @@ p {
     text-align: right;
   }
   .photo-grid {
-    columns: 2;
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
   .photo-grid figure {
-    margin-bottom: 0.4rem;
+    flex: 1 1 100%;
+  }
+  .photo-grid::after {
+    display: none;
   }
   .viewer-details {
     flex-direction: column;
@@ -391,8 +478,5 @@ p {
   }
   .viewer-step {
     width: 2.25rem;
-  }
-  #viewer-image {
-    max-height: 65vh;
   }
 }

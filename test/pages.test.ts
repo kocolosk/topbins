@@ -60,6 +60,17 @@ describe("gallery rendering", () => {
     expect(html).toContain('aria-label="Media viewer"');
     expect(html).toContain('id="viewer-previous"');
   });
+  it("justifies grid rows by aspect-ratio class and keeps times out of the grid", () => {
+    const html = albumPage(album, new URL("https://example.test/albums/match"));
+    // 3072x2048 is 3:2; inline styles are forbidden by the CSP.
+    expect(html).toContain('<figure class="ar-15">');
+    expect(html).not.toContain("style=");
+    const grid = html.slice(html.indexOf('class="photo-grid"'));
+    const beforeCaption = grid.slice(0, grid.indexOf("<figcaption"));
+    expect(beforeCaption).not.toContain("capture-time");
+    // The time remains available to the viewer through the hidden caption.
+    expect(grid).toContain("capture-time");
+  });
 
   it("does not create discoverability links from an unlisted album", () => {
     const html = albumPage(
