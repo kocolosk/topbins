@@ -85,8 +85,11 @@ aspect ratio without upscaling. AVIF/WebP are selected only when explicitly
 accepted; otherwise JPEG. Explicit qualities: JPEG 82, WebP 80, AVIF 65. AVIF is
 limited to 1,200 px, so only the grid preset is AVIF; the viewer negotiates WebP. The internal edge cache is keyed by media ID, source
 version, preset, and format, with a one-day TTL. Every cache hit still requires a
-fresh publication check; draft previews bypass the cache. Browser responses
-remain no-store. Video `grid`/`viewer` image URLs use the current poster hash,
+fresh publication check; draft previews bypass the cache. Transformed grid/viewer
+responses carry `Cache-Control: private, max-age=3600` (URLs embed the source hash, so
+content never changes; unpublishing applies to new requests immediately but a
+browser may reuse an image it already loaded for up to an hour). Other dynamic
+responses remain no-store. The viewer prefetches its neighbouring photos. Video `grid`/`viewer` image URLs use the current poster hash,
 not the MP4 hash; changing the poster therefore changes its cache key.
 Preview and errors are never publicly cached.
 

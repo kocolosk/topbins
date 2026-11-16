@@ -18,6 +18,17 @@
   let touchStart = null;
   let opener = null;
 
+  // Warm the browser cache for the neighbours so stepping through is instant.
+  const prefetched = new Set();
+  function prefetch(index) {
+    const photo = photos[index];
+    if (!photo || photo.dataset.kind === "video") return;
+    const url = photo.dataset.viewer;
+    if (prefetched.has(url)) return;
+    prefetched.add(url);
+    new Image().src = url;
+  }
+
   function show(index, updateHistory = true) {
     current = Math.max(0, Math.min(photos.length - 1, index));
     const photo = photos[current];
@@ -48,6 +59,8 @@
     if (updateHistory) {
       history.replaceState(null, "", photo.getAttribute("href"));
     }
+    prefetch(current + 1);
+    prefetch(current - 1);
     if (!dialog.open) {
       dialog.showModal();
       document.documentElement.classList.add("viewer-open");
