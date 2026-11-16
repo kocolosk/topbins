@@ -34,3 +34,31 @@ jobs:
       - run: mise run check
       - run: mise exec -- npm run demo -- --smoke
       - run: git diff --exit-code
+
+  browser:
+    name: Browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          version: "2026.9.12"
+          install_args: "--locked node conda:ffmpeg conda:exiftool"
+      - run: mise run setup
+      - run: mise exec -- npx playwright install --with-deps chromium firefox webkit
+      - run: mise run test:browser
+      - run: git diff --exit-code
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

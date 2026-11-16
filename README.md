@@ -110,8 +110,10 @@ Playwright starts `npm run demo` itself (or reuses one already on port 8790), so
 only the synthetic demo media is involved and nothing touches a deployed site.
 Run one browser with `mise exec -- npx playwright test --project chromium`; after
 a failure, `mise exec -- npx playwright show-report` opens the HTML report. The
-tests are separate from `mise run check` and vitest. WebKit and Firefox on Linux
-may need system libraries (`playwright install --with-deps`).
+tests are separate from `mise run check` and vitest; CI runs them in their own
+`browser` job, which installs the browsers with `playwright install --with-deps`
+(WebKit and Firefox on Linux need system libraries) and uploads the Playwright
+report on failure.
 
 ## Import and preview a match locally
 
