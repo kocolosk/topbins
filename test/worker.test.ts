@@ -458,6 +458,37 @@ describe("publisher and visibility", () => {
     const cleared = await (await call("/albums/match")).text();
     expect(cleared).not.toContain("generative AI");
   });
+  it("shows only whitelisted camera details from private metadata", async () => {
+    await env.MEDIA.put(
+      `sources/${sha}.jpg`,
+      new Uint8Array([255, 216, 255, 217]),
+      { customMetadata: { width: "100", height: "80" } },
+    );
+    const withCamera = {
+      ...album,
+      state: "published",
+      media: [
+        {
+          ...media,
+          privateMetadata: {
+            camera: {
+              Model: "Synthetic Cam",
+              ISO: 400,
+              SerialNumber: "SERIAL-SHOULD-NOT-LEAK",
+            },
+          },
+        },
+      ],
+    };
+    expect((await put(withCamera)).status).toBe(200);
+    const page = await (await call("/albums/match")).text();
+    expect(page).toContain("Camera details");
+    expect(page).toContain("<dd>Synthetic Cam</dd>");
+    expect(page).toContain("<dt>ISO</dt><dd>400</dd>");
+    expect(page).not.toContain("SERIAL-SHOULD-NOT-LEAK");
+    const api = await (await call("/api/albums/match")).text();
+    expect(api).not.toContain("SERIAL-SHOULD-NOT-LEAK");
+  });
   it("gates drafts, publishes public and unlisted without private metadata, and retains media", async () => {
     await env.MEDIA.put(
       `sources/${sha}.jpg`,

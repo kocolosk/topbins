@@ -18,6 +18,7 @@ const album: Album = {
       duration: null,
       posterUrl: null,
       aiDisclosure: null,
+      camera: null,
       width: 3072,
       height: 2048,
       captureTime: "2026-10-10T15:04:19-04:00",
@@ -70,6 +71,27 @@ describe("gallery rendering", () => {
     expect(beforeCaption).not.toContain("capture-time");
     // The time remains available to the viewer through the hidden caption.
     expect(grid).toContain("capture-time");
+  });
+
+  it("offers collapsed camera details only when the photo has them", () => {
+    const url = new URL("https://example.test/albums/match");
+    expect(albumPage(album, url)).not.toContain("camera-details");
+    const photo = album.media[0];
+    if (!photo) throw new Error("fixture missing");
+    const html = albumPage(
+      {
+        ...album,
+        media: [
+          { ...photo, camera: [{ label: "Lens", value: "<b>70-200</b>" }] },
+        ],
+      },
+      url,
+    );
+    expect(html).toContain(
+      '<details class="camera-details"><summary>Camera details</summary>',
+    );
+    expect(html).not.toContain("<details open");
+    expect(html).toContain("<dt>Lens</dt><dd>&lt;b&gt;70-200&lt;/b&gt;</dd>");
   });
 
   it("does not create discoverability links from an unlisted album", () => {

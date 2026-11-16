@@ -545,7 +545,7 @@ async function performImport(
         console.warn(
           `${name}: capture time or timezone missing/invalid; no timezone will be inferred`,
         );
-      // Not displayed yet; recorded so a camera-details view needs no re-import.
+      // Shown (whitelisted and formatted) by src/camera.ts in the viewer.
       privateMetadata.camera = Object.fromEntries(
         cameraTags
           .filter((tag) => metadata[tag] !== undefined)

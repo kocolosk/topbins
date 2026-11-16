@@ -33,6 +33,7 @@ export default defineConfig({
             "test/provenance.test.ts",
             "test/video.test.ts",
             "test/pages.test.ts",
+            "test/camera.test.ts",
             "test/preview.test.ts",
           ],
         },
