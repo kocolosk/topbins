@@ -10,6 +10,7 @@ export interface MediaDTO {
   copyright: string | null;
   usageTerms: string | null;
   rightsUrl: string | null;
+  aiDisclosure: "ai-edited" | "ai-generated" | null;
   gridUrl: string;
   viewerUrl: string;
   downloadUrl: string;
@@ -52,6 +53,7 @@ interface CatalogRow {
   copyright: string | null;
   usage_terms: string | null;
   rights_url: string | null;
+  ai_disclosure: "ai-edited" | "ai-generated" | null;
 }
 
 // Eligibility, album metadata, and media are read in one statement/snapshot.
@@ -72,7 +74,7 @@ async function readAlbums(
       m.kind, m.duration, m.poster_sha256,
       json_extract(p.metadata, '$.captureTimeOriginal') AS capture_original,
       json_extract(p.metadata, '$.captureOffsetOriginal') AS capture_offset,
-      m.credit, m.copyright, m.usage_terms, m.rights_url
+      m.credit, m.copyright, m.usage_terms, m.rights_url, m.ai_disclosure
     FROM albums a
     JOIN seasons s ON s.id=a.season_id AND s.team_id=a.team_id
     JOIN teams t ON t.id=a.team_id
@@ -121,6 +123,7 @@ async function readAlbums(
         copyright: row.copyright,
         usageTerms: row.usage_terms,
         rightsUrl: row.rights_url,
+        aiDisclosure: row.ai_disclosure,
         gridUrl: row.kind === "video" ? `${poster}/grid` : `${base}/grid`,
         viewerUrl: row.kind === "video" ? `${base}/play` : `${base}/viewer`,
         downloadUrl: `${base}/download`,

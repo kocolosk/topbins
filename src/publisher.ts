@@ -46,6 +46,7 @@ function validMedia(x: unknown): x is Obj {
       "kind",
       "duration",
       "posterSha256",
+      "aiDisclosure",
     ])
   )
     return false;
@@ -88,6 +89,13 @@ function validMedia(x: unknown): x is Obj {
   )
     return false;
   if (x.kind !== undefined && x.kind !== "photo" && x.kind !== "video")
+    return false;
+  if (
+    x.aiDisclosure !== undefined &&
+    x.aiDisclosure !== null &&
+    x.aiDisclosure !== "ai-edited" &&
+    x.aiDisclosure !== "ai-generated"
+  )
     return false;
   if (x.kind === "video") {
     if (
@@ -231,6 +239,7 @@ export async function publisher(
         kind: "photo" | "video";
         duration: number | null;
         poster_sha256: string | null;
+        ai_disclosure: string | null;
       }>();
     return json({
       id,
@@ -255,6 +264,7 @@ export async function publisher(
         copyright: m.copyright,
         usageTerms: m.usage_terms,
         rightsUrl: m.rights_url,
+        aiDisclosure: m.ai_disclosure,
         privateMetadata: JSON.parse(m.metadata),
       })),
     });
@@ -402,8 +412,8 @@ export async function publisher(
       ),
     );
     statements.push(
-      env.DB.prepare(`INSERT INTO media(id,album_id,source_sha256,width,height,capture_time,credit,copyright,usage_terms,rights_url,kind,duration,poster_sha256) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET source_sha256=excluded.source_sha256,width=excluded.width,height=excluded.height,capture_time=excluded.capture_time,credit=excluded.credit,copyright=excluded.copyright,usage_terms=excluded.usage_terms,rights_url=excluded.rights_url,kind=excluded.kind,duration=excluded.duration,poster_sha256=excluded.poster_sha256
+      env.DB.prepare(`INSERT INTO media(id,album_id,source_sha256,width,height,capture_time,credit,copyright,usage_terms,rights_url,kind,duration,poster_sha256,ai_disclosure) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET source_sha256=excluded.source_sha256,width=excluded.width,height=excluded.height,capture_time=excluded.capture_time,credit=excluded.credit,copyright=excluded.copyright,usage_terms=excluded.usage_terms,rights_url=excluded.rights_url,kind=excluded.kind,duration=excluded.duration,poster_sha256=excluded.poster_sha256,ai_disclosure=excluded.ai_disclosure
       WHERE album_id=excluded.album_id AND (source_sha256=excluded.source_sha256 OR ?=1)`).bind(
         m.id,
         id,
@@ -420,6 +430,7 @@ export async function publisher(
         m.kind ?? "photo",
         m.duration ?? null,
         m.posterSha256 ?? null,
+        m.aiDisclosure ?? null,
         m.replace === true ? 1 : 0,
       ),
     );

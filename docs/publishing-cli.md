@@ -115,12 +115,26 @@ Filenames remain private. The CLI warns when an offset or timestamp is missing.
 IPTC/XMP keyword originals are included only in authenticated private
 metadata; they are not included in sanitized source files. ExifTool removes
 metadata and restores only capture fields, orientation, color profile/color space, and
-approved rights, without recompressing pixels. C2PA/JUMBF content is refused
-for explicit provenance review. Input and output must be below 20,000,000
+approved rights, without recompressing pixels. Input and output must be below 20,000,000
 bytes; dimensions must not exceed 12,000 pixels per side or 100 megapixels.
 Temporary copies are removed on normal completion or failure; abrupt process
 termination may leave OS temporary files, so use an appropriately private
 temporary directory.
+
+## Content Credentials and AI disclosure
+
+C2PA Content Credentials cannot survive sanitization: their hard binding hashes
+every byte except the manifest, and GPS, serial numbers and keywords must be
+removed, so any valid manifest would break. The importer therefore removes them
+(and verifies none remain) and keeps only a disclosure. It reads the declared
+IPTC digital source type from the manifest actions or plain XMP and maps a closed
+vocabulary: `trainedAlgorithmicMedia` becomes `ai-generated`,
+`compositeWithTrainedAlgorithmicMedia` (for example Lightroom generative remove)
+becomes `ai-edited`. Nothing else from the manifest is stored. The sanitized
+file gets the matching `XMP-iptcExt:DigitalSourceType`, and the gallery shows
+"Edited with generative AI" or "Generated with AI". Manifest signatures are not
+verified; this is a disclosure aid, not proof. A warning names each file whose
+credentials were removed. Videos with JUMBF content are still refused.
 
 ICC profiles can themselves contain identifying text. The importer preserves
 only byte-for-byte approved profiles from `cli/color-profiles.ts`, verified by

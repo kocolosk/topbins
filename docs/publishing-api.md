@@ -47,7 +47,8 @@ override it. Filenames are never included in public responses.
 positive `duration` in seconds and `posterSha256` referring to an already
 validated JPEG. The video source and poster must both exist before publication.
 Public DTOs include `kind`, nullable `duration`, and nullable `posterUrl`.
-Dimensions must match the inspected source (allowing orientation-swapped axes).
+Optional `aiDisclosure` is `null`, `ai-edited` or `ai-generated`; it is public and
+shown on the photo. Dimensions must match the inspected source (allowing orientation-swapped axes).
 Set `replace: true` to change an existing source.
 Omitted existing media remain in the album. All assets must exist before commit.
 The response provides `albumUrl` and `previewUrl`; these are relative paths.

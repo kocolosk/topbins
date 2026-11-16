@@ -118,6 +118,9 @@ function rights(photo: Photo): string {
     photo.credit
       ? `<p>${photo.kind === "video" ? "Video" : "Photo"} by ${escapeHtml(photo.credit)}</p>`
       : "",
+    photo.aiDisclosure
+      ? `<p class="ai-disclosure">${photo.aiDisclosure === "ai-generated" ? "Generated with AI" : "Edited with generative AI"}</p>`
+      : "",
     photo.copyright ? `<p>${escapeHtml(photo.copyright)}</p>` : "",
     photo.usageTerms ? `<p>${escapeHtml(photo.usageTerms)}</p>` : "",
     photo.rightsUrl && /^https?:\/\//i.test(photo.rightsUrl)
