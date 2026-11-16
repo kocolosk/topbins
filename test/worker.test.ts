@@ -400,7 +400,9 @@ describe("publisher and visibility", () => {
     });
     expect(transformed.status).toBe(200);
     expect(transformed.headers.get("Content-Type")).toBe("image/webp");
-    expect(transformed.headers.get("Cache-Control")).toBe("no-store");
+    expect(transformed.headers.get("Cache-Control")).toBe(
+      "private, max-age=3600",
+    );
     const imageBytes = await transformed.arrayBuffer();
     const cached = await worker.fetch(
       new Request(base + imageUrl, { headers: { Accept: "image/webp" } }),
@@ -416,6 +418,7 @@ describe("publisher and visibility", () => {
       },
     );
     expect(cached.status).toBe(200);
+    expect(cached.headers.get("Cache-Control")).toBe("private, max-age=3600");
     expect(await cached.arrayBuffer()).toEqual(imageBytes);
     // AVIF output is capped at 1,200 px, so the 2560 px viewer negotiates WebP
     // and is labeled by what was actually produced.

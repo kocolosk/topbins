@@ -3,6 +3,11 @@ import { serveSource } from "./source";
 
 // Explicit quality: the binding's default WebP output was lossless (several MB).
 // Tuned on real exports (SSIM and 2x crops vs. the Lanczos-resized source).
+// Media URLs embed the source hash, so a given URL never changes content.
+// Browsers may reuse it privately for an hour; unpublishing still takes effect
+// for new requests immediately because the Worker re-checks publication.
+const browserCache = "private, max-age=3600";
+
 const quality = {
   "image/jpeg": 82,
   "image/webp": 80,
@@ -80,17 +85,20 @@ export async function serveMedia(
         format,
       );
       result.headers.set("Vary", "Accept");
+      result.headers.set("Cache-Control", browserCache);
       return result;
     }
   }
   if (request.method === "HEAD") {
     const result = response(null, 200, format);
     result.headers.set("Vary", "Accept");
+    result.headers.set("Cache-Control", browserCache);
     return result;
   }
   const size = match[3] === "grid" ? 640 : 2560;
   // The binding fails transiently under bursts of concurrent transforms, so
-  // retry (up to three attempts) with a fresh source stream. Only error names/codes are logged.
+  // retry (up to three attempts) with a fresh source stream. Only error
+  // names/codes are logged.
   let transformed: Response | undefined;
   for (let attempt = 0; attempt < 3 && !transformed; attempt++) {
     const object = await env.MEDIA.get(`sources/${match[2]}.jpg`);
@@ -119,6 +127,7 @@ export async function serveMedia(
     format,
   );
   result.headers.set("Vary", "Accept");
+  result.headers.set("Cache-Control", browserCache);
   if (!preview) {
     const cacheEntry = new Response(result.clone().body, {
       headers: {
