@@ -225,4 +225,36 @@ describe("importing photos with provenance metadata", () => {
       aiDisclosure: null,
     });
   });
+
+  it("passes camera and exposure details through but never serial numbers", async () => {
+    const result = await importPhoto(async (source) => {
+      await execute("exiftool", [
+        "-overwrite_original",
+        "-Make=SyntheticCam",
+        "-Model=Synthetic X1",
+        "-LensModel=Synthetic 100mm f/2",
+        "-FNumber=2.8",
+        "-ExposureTime=0.001",
+        "-ISO=800",
+        "-FocalLength=100",
+        "-SerialNumber=SYNTH-BODY-123",
+        "-LensSerialNumber=SYNTH-LENS-456",
+        "-OwnerName=Synthetic Owner",
+        "-GPSLatitude=10",
+        "-GPSLatitudeRef=N",
+        source,
+      ]);
+    });
+    expect(result.metadata).toContain("SyntheticCam");
+    expect(result.metadata).toContain("Synthetic 100mm f/2");
+    expect(result.metadata).toContain('"ExifIFD:ISO": 800');
+    for (const secret of ["SYNTH-BODY", "SYNTH-LENS", "Synthetic Owner", "GPS"])
+      expect(result.metadata).not.toContain(secret);
+    expect(result.payload.media[0].privateMetadata.camera).toMatchObject({
+      Make: "SyntheticCam",
+      Model: "Synthetic X1",
+      ISO: 800,
+    });
+    expect(JSON.stringify(result.payload)).not.toContain("SYNTH-");
+  });
 });

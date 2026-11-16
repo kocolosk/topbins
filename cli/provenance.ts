@@ -49,3 +49,25 @@ export function hasJumbfSegment(jpeg: Uint8Array): boolean {
   }
   return false;
 }
+
+// Camera/exposure fields that pass through to downloads and are recorded for a
+// future "camera details" view. Serial numbers (body, lens, internal), owner
+// names, GPS, thumbnails and maker notes are deliberately absent.
+export const cameraTags = [
+  "IFD0:Make",
+  "IFD0:Model",
+  "ExifIFD:LensMake",
+  "ExifIFD:LensModel",
+  "ExifIFD:LensInfo",
+  "ExifIFD:FocalLength",
+  "ExifIFD:FocalLengthIn35mmFormat",
+  "ExifIFD:FNumber",
+  "ExifIFD:ExposureTime",
+  "ExifIFD:ISO",
+  "ExifIFD:ExposureProgram",
+  "ExifIFD:ExposureCompensation",
+  "ExifIFD:ExposureMode",
+  "ExifIFD:MeteringMode",
+  "ExifIFD:Flash",
+  "ExifIFD:WhiteBalance",
+] as const;
