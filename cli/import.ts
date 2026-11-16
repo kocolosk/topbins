@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 import { parseManifest, validateRightsUrl } from "./manifest.ts";
 import type { Rights } from "./manifest.ts";
 import { validateColorProfile } from "./color-profiles.ts";
-import { classify, digitalSourceType } from "./provenance.ts";
+import { classify, digitalSourceType, hasJumbfSegment } from "./provenance.ts";
 import { prepareVideo, VIDEO_LIMIT } from "./video.ts";
 
 type Metadata = Record<string, unknown>;
@@ -575,10 +575,7 @@ async function performImport(
         );
       tool([...args, output]);
       const sanitized = await readFile(output);
-      if (
-        sanitized.includes(Buffer.from("c2pa", "ascii")) ||
-        sanitized.includes(Buffer.from("jumb", "ascii"))
-      )
+      if (hasJumbfSegment(sanitized))
         throw new Error(`${name}: Content Credentials were not removed`);
       if (sanitized.length >= 20_000_000)
         throw new Error(`${name}: sanitized file must be under 20 MB`);

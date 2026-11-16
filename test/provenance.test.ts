@@ -88,6 +88,7 @@ describe("AI disclosure vocabulary", () => {
 
 async function importPhoto(
   prepare: (path: string, dir: string) => Promise<void>,
+  defaults: Record<string, string> = {},
 ) {
   const dir = await mkdtemp(join(tmpdir(), "topbins-prov-"));
   const requests: { method: string; url: string; body: Buffer }[] = [];
@@ -137,6 +138,7 @@ async function importPhoto(
         title: "Match",
         date: "2024-01-01",
         visibility: "unlisted",
+        defaults,
         files: [{ file: "photo.jpg" }],
       }),
     );
@@ -210,5 +212,17 @@ describe("importing photos with provenance metadata", () => {
     const plain = await importPhoto(async () => {});
     expect(plain.payload.media[0].aiDisclosure).toBeNull();
     expect(plain.metadata).not.toContain("DigitalSourceType");
+  });
+
+  it("does not mistake approved rights text for leftover credentials", async () => {
+    const result = await importPhoto(async () => {}, {
+      credit: "jumbo c2pa studio",
+      rightsUrl: "https://example.test/c2pa-license",
+    });
+    expect(result.payload.media[0]).toMatchObject({
+      credit: "jumbo c2pa studio",
+      rightsUrl: "https://example.test/c2pa-license",
+      aiDisclosure: null,
+    });
   });
 });
