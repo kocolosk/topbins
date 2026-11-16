@@ -1,48 +1,91 @@
 (() => {
-  // Justified rows (see style.css) leave the last row at its base height, which
-  // is shorter than the stretched rows above it. Size it to match the previous
-  // row, shrinking only if it would not fit. CSSOM styles are CSP-safe.
+  // Justified rows. The CSS (see style.css) wraps greedily using ratios rounded
+  // to tenths; that is the no-script fallback. Here, choose where rows break so
+  // every row stays close to the target height, and size figures from each
+  // image's exact ratio. CSSOM styles are CSP-safe.
   const grid = document.querySelector(".photo-grid");
   if (!grid) return;
   const figures = [...grid.children].filter((el) => el.tagName === "FIGURE");
+  const ratios = figures.map((figure) => {
+    const img = figure.querySelector("img");
+    const ratio =
+      Number(img?.getAttribute("width")) / Number(img?.getAttribute("height"));
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1.5;
+  });
+  const maxPerRow = 8;
 
-  function balanceLastRow() {
+  // Height at which figures start..end-1 exactly fill the width.
+  function fillHeight(start, end, width, gap) {
+    let sum = 0;
+    for (let i = start; i < end; i++) sum += ratios[i];
+    return (width - gap * (end - start - 1)) / sum;
+  }
+
+  // Minimum total squared log deviation from the target height. The last row
+  // is not stretched, so it only costs anything if it would be squeezed.
+  function rowBreaks(width, gap, target) {
+    const n = ratios.length;
+    const cost = [0];
+    const from = [0];
+    for (let end = 1; end <= n; end++) {
+      cost[end] = Infinity;
+      for (let start = Math.max(0, end - maxPerRow); start < end; start++) {
+        const height = fillHeight(start, end, width, gap);
+        if (!(height > 0)) continue;
+        const error = Math.log(height / target);
+        const total =
+          cost[start] + (end === n ? Math.min(0, error) : error) ** 2;
+        if (total < cost[end]) {
+          cost[end] = total;
+          from[end] = start;
+        }
+      }
+    }
+    const rows = [];
+    for (let end = n; end > 0; end = from[end]) rows.unshift([from[end], end]);
+    return rows;
+  }
+
+  function layout() {
     for (const figure of figures) {
       figure.style.removeProperty("flex");
       figure.style.removeProperty("width");
     }
     // One column on narrow screens: every figure is its own row.
-    if (figures.length < 2 || matchMedia("(max-width: 42rem)").matches) return;
-    const tops = figures.map((figure) => figure.offsetTop);
-    const lastTop = Math.max(...tops);
-    const last = figures.filter((_, i) => tops[i] === lastTop);
-    const previous = figures.filter((_, i) => tops[i] < lastTop);
-    const reference = previous.at(-1)?.querySelector("img");
-    if (!reference || last.length === figures.length) return;
-    const height = reference.getBoundingClientRect().height;
-    const widths = last.map((figure) => {
-      const img = figure.querySelector("img");
-      return (
-        (height * Number(img.getAttribute("width"))) /
-        Number(img.getAttribute("height"))
-      );
-    });
-    const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
-    const available = grid.clientWidth - gap * (last.length - 1);
-    const scale = Math.min(1, available / widths.reduce((a, b) => a + b, 0));
-    last.forEach((figure, i) => {
-      figure.style.flex = "none";
-      figure.style.width = `${widths[i] * scale}px`;
+    if (!figures.length || matchMedia("(max-width: 42rem)").matches) return;
+    const style = getComputedStyle(grid);
+    const gap = parseFloat(style.columnGap) || 0;
+    // --row is registered as a length, so it computes to pixels.
+    const target = parseFloat(style.getPropertyValue("--row")) || 240;
+    // A pixel of slack so rounding never wraps the last figure of a full row.
+    const width = grid.clientWidth - 1;
+    const rows = rowBreaks(width, gap, target);
+    let previous = target;
+    rows.forEach(([start, end], index) => {
+      let height = fillHeight(start, end, width, gap);
+      // The last row matches the row above rather than filling the width.
+      if (index === rows.length - 1) height = Math.min(height, previous);
+      previous = height;
+      for (let i = start; i < end; i++) {
+        figures[i].style.flex = "none";
+        figures[i].style.width = `${ratios[i] * height}px`;
+      }
     });
   }
 
+  // Lay out before first paint, then again only when the grid width changes
+  // (window resizes, scrollbars appearing, crossing the mobile breakpoint).
+  let laidOut = grid.clientWidth;
+  layout();
   let frame = 0;
-  const schedule = () => {
+  new ResizeObserver(() => {
     cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(balanceLastRow);
-  };
-  schedule();
-  addEventListener("resize", schedule);
+    frame = requestAnimationFrame(() => {
+      if (grid.clientWidth === laidOut) return;
+      laidOut = grid.clientWidth;
+      layout();
+    });
+  }).observe(grid);
 })();
 
 (() => {

@@ -168,14 +168,22 @@ p {
   height: 12rem;
   background: var(--mist);
 }
+/* Target row height: larger on wide screens, where rows hold more photos.
+   Registered as a length so gallery.js reads it resolved to pixels. */
+@property --row {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 240px;
+}
 .photo-grid {
-  --row: 15rem;
+  --row: clamp(15rem, 20vw, 18rem);
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-/* Justified rows: photos flow left to right, then down; each grows in
-   proportion to its aspect ratio so rows end up one height. */
+/* Justified rows without script: photos flow left to right, then down; each
+   grows in proportion to its aspect ratio so rows end up one height.
+   gallery.js replaces this with balanced row breaks and exact ratios. */
 .photo-grid figure {
   --ar: 1.5;
   flex: calc(var(--ar) * 100) 1 calc(var(--ar) * var(--row));

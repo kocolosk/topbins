@@ -99,7 +99,10 @@ seasons. Add forward-only numbered migrations; do not edit applied migrations.
 WebKit with Playwright: the last justified row matching the row above, the
 single-column mobile layout, viewer open/arrow keys/Escape with the `?photo=`
 URL, neighbour prefetch, and no console errors, CSP violations or 4xx/5xx
-responses. Tests use auto-waiting rather than sleeps.
+responses. `e2e/layout.spec.ts` checks row layout on a synthetic mix of 3:2, 16:9
+and 4:5 images at several widths: one height per row, full-width rows near the
+target height, and re-layout across the mobile breakpoint. Tests use
+auto-waiting rather than sleeps.
 
 ```sh
 mise exec -- npm run test:browser:install   # once; browsers live in Playwright's cache, outside mise
