@@ -84,6 +84,31 @@ test("viewer opens, steps with arrow keys and closes with Escape", async ({
   await expect(page).not.toHaveURL(/photo=/);
 });
 
+test("camera details are collapsed, expand, and stay open between photos", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(album);
+  await page.locator(".photo-link").first().click();
+  const details = page.locator("#viewer-rights .camera-details");
+  await expect(details).toBeVisible();
+  await expect(details).not.toHaveAttribute("open", "");
+  await expect(details.locator("dd").first()).toBeHidden();
+
+  await details.locator("summary").click();
+  await expect(details).toHaveAttribute("open", "");
+  await expect(details).toContainText("Canon EOS Synthetic");
+  await expect(details).toContainText("f/2.8");
+  await expect(details).toContainText("1/1000 s");
+  await expect(details).toContainText("ISO");
+
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator("#viewer-position")).toHaveText("2 / 3");
+  await expect(details).toHaveAttribute("open", "");
+  // Serial numbers and keywords never reach the page.
+  await expect(page.locator("body")).not.toContainText("synthetic-private");
+});
+
 test("opening a photo prefetches its neighbour", async ({ page }) => {
   const requested: string[] = [];
   page.on("request", (request) => {

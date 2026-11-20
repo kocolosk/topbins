@@ -137,11 +137,15 @@
     download.href = photo.dataset.download;
     download.textContent = isVideo ? "Download video" : "Download photo";
     position.textContent = `${current + 1} / ${photos.length}`;
+    // Keep the camera details expanded while stepping through photos.
+    const detailsOpen = credit.querySelector("details")?.open === true;
     credit.replaceChildren(
       ...[...photo.parentElement.querySelector(".photo-rights").childNodes].map(
         (node) => node.cloneNode(true),
       ),
     );
+    const details = credit.querySelector("details");
+    if (details && detailsOpen) details.open = true;
     previous.disabled = current === 0;
     next.disabled = current === photos.length - 1;
     share.textContent = "Copy link";

@@ -427,6 +427,21 @@ p {
 .rights p {
   margin: 0 0 0.4rem;
 }
+.camera-details summary {
+  cursor: pointer;
+}
+.camera-details dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.2rem 1rem;
+  margin: 0.5rem 0 0;
+}
+.camera-details dt {
+  opacity: 0.75;
+}
+.camera-details dd {
+  margin: 0;
+}
 .viewer-actions {
   display: flex;
   flex-wrap: wrap;

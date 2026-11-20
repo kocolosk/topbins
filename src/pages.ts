@@ -119,6 +119,16 @@ function photoTime(photo: Photo): string {
   return `<p class="capture-time"><time datetime="${escapeHtml(value)}">${escapeHtml(`${match[1]} ${match[2]} (${zone})`)}</time></p>`;
 }
 
+function cameraDetails(photo: Photo): string {
+  if (!photo.camera) return "";
+  return `<details class="camera-details"><summary>Camera details</summary><dl>${photo.camera
+    .map(
+      ({ label, value }) =>
+        `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`,
+    )
+    .join("")}</dl></details>`;
+}
+
 function rights(photo: Photo): string {
   return [
     photoTime(photo),
@@ -133,6 +143,7 @@ function rights(photo: Photo): string {
     photo.rightsUrl && /^https?:\/\//i.test(photo.rightsUrl)
       ? `<p><a href="${escapeHtml(photo.rightsUrl)}" rel="noreferrer">Usage information</a></p>`
       : "",
+    cameraDetails(photo),
   ].join("");
 }
 

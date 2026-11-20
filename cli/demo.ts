@@ -102,6 +102,13 @@ try {
       "-OffsetTimeOriginal=-04:00",
       "-IPTC:Keywords=synthetic-private-keyword",
       "-XMP-dc:Creator=Demo photographer",
+      "-Make=Canon",
+      "-Model=Canon EOS Synthetic",
+      "-LensModel=Synthetic 70-200mm f/2.8",
+      "-FocalLength=200",
+      "-FNumber=2.8",
+      "-ExposureTime=0.001",
+      "-ISO=800",
       name,
     ]);
   }

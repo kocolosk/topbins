@@ -1,3 +1,5 @@
+import { type CameraDetail, publicCamera } from "./camera";
+
 export interface MediaDTO {
   id: string;
   kind: "photo" | "video";
@@ -11,6 +13,7 @@ export interface MediaDTO {
   usageTerms: string | null;
   rightsUrl: string | null;
   aiDisclosure: "ai-edited" | "ai-generated" | null;
+  camera: CameraDetail[] | null;
   gridUrl: string;
   viewerUrl: string;
   downloadUrl: string;
@@ -54,6 +57,7 @@ interface CatalogRow {
   usage_terms: string | null;
   rights_url: string | null;
   ai_disclosure: "ai-edited" | "ai-generated" | null;
+  camera: string | null;
 }
 
 // Eligibility, album metadata, and media are read in one statement/snapshot.
@@ -74,6 +78,7 @@ async function readAlbums(
       m.kind, m.duration, m.poster_sha256,
       json_extract(p.metadata, '$.captureTimeOriginal') AS capture_original,
       json_extract(p.metadata, '$.captureOffsetOriginal') AS capture_offset,
+      json_extract(p.metadata, '$.camera') AS camera,
       m.credit, m.copyright, m.usage_terms, m.rights_url, m.ai_disclosure
     FROM albums a
     JOIN seasons s ON s.id=a.season_id AND s.team_id=a.team_id
@@ -124,6 +129,7 @@ async function readAlbums(
         usageTerms: row.usage_terms,
         rightsUrl: row.rights_url,
         aiDisclosure: row.ai_disclosure,
+        camera: parseCamera(row.camera),
         gridUrl: row.kind === "video" ? `${poster}/grid` : `${base}/grid`,
         viewerUrl: row.kind === "video" ? `${base}/play` : `${base}/viewer`,
         downloadUrl: `${base}/download`,
@@ -131,6 +137,15 @@ async function readAlbums(
     }
   }
   return [...albums.values()];
+}
+
+function parseCamera(stored: string | null): CameraDetail[] | null {
+  if (!stored) return null;
+  try {
+    return publicCamera(JSON.parse(stored));
+  } catch {
+    return null;
+  }
 }
 
 function publicCaptureTime(

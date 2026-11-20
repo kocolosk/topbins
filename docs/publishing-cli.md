@@ -119,9 +119,11 @@ approved rights, and camera/exposure details (make, model, lens, focal length,
 aperture, shutter, ISO, exposure program/mode/compensation, metering, flash, white
 balance), without recompressing pixels. Camera and lens serial numbers, owner
 names, GPS, keywords, thumbnails, maker notes and edit history are never kept.
-The same camera details are recorded in private metadata (`camera`) so a future
-gallery view needs no re-import. Existing albums need `--replace` to pick the
-new fields up, because the sanitized bytes change. Input and output must be below 20,000,000
+The same camera details are recorded in private metadata (`camera`). The photo
+viewer shows them in a collapsed "Camera details" section, formatted by the
+Worker from that fixed field list only (unknown keys and malformed values are
+dropped). Existing albums need `--replace` to pick the fields up, because the
+sanitized bytes change. Input and output must be below 20,000,000
 bytes; dimensions must not exceed 12,000 pixels per side or 100 megapixels.
 Temporary copies are removed on normal completion or failure; abrupt process
 termination may leave OS temporary files, so use an appropriately private
