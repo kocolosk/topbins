@@ -20,6 +20,8 @@ primarily for players and families to browse, download, and share.
 - Hosting should use Cloudflare-native services with low recurring cost and
   little operational maintenance.
 - The site is a publishing destination, not the sole archive or backup.
+- Adam Kocoloski is the sole publisher in v1. Team organization supports browsing,
+  not collaborative ownership or contributions.
 
 ### Out of scope for v1
 
@@ -54,9 +56,15 @@ The browsing hierarchy is **team → season → match**.
   download action.
 - Provide a simple contact/removal-request path.
 
+Use a gallery-first design with restrained branding, minimal navigation, and
+obvious download/share actions. Match titles, teams, and dates take precedence
+over site branding. `topbins` is an internal project name; no public site name
+or logo is required. Photographer credit must be discoverable, not prominent
+name-based branding.
+
 **Proposed defaults:** newest matches first within a season; chronological media
 ordering within an album; a justified photo grid; explicitly selected covers,
-falling back to the first photo. Visual design remains open.
+falling back to the first photo. Detailed visual styling remains open.
 
 ## 3. Publication and visibility
 
@@ -139,6 +147,18 @@ Private metadata belongs in publisher-only records, not public R2 object
 metadata or gallery responses. Private keywords must not appear in HTML,
 frontend payloads, public APIs, autocomplete, filenames, or downloadable files.
 
+### Capture timestamps
+
+- Honor source capture timestamps and explicit timezone offsets.
+- Interpret timezone-less camera timestamps as `America/New_York`, using the
+  capture date's daylight-saving rules rather than a fixed UTC offset.
+- Report missing, ambiguous, or conflicting timestamp metadata during preflight;
+  ordering must remain deterministic.
+- Do not infer or correct timezones from GPS coordinates or GPS UTC timestamps,
+  convert timestamps based on location, or maintain separate publisher-corrected
+  times in the gallery. The publisher corrects RAWs/Lightroom or exported JPEGs
+  upstream so the gallery and source workflow remain consistent.
+
 ### Publish selectively
 
 Extract and normalize these fields where available:
@@ -147,23 +167,50 @@ Extract and normalize these fields where available:
 - Copyright notice: IPTC Copyright Notice, XMP Rights, EXIF Copyright.
 - Usage terms: XMP Rights Usage Terms.
 - Rights URL: XMP Web Statement of Rights.
+- Camera model, lens model, focal length, shutter speed, aperture, and ISO.
 
 Use site-wide defaults for missing fields. Explicit embedded values take
 precedence; report meaningful conflicts between metadata representations.
 Credit and copyright do not imply permission: never invent usage terms from
 either. Treat metadata as untrusted text and validate public URLs.
 
+Approved camera/exposure fields may remain in downloadable JPEGs and be included
+in the public catalog for an optional photo-details display. Do not rely on
+transformed display images retaining embedded metadata.
+
 Sanitize a publishing copy before upload:
 
-- Remove GPS, keywords, identifying filenames, and unapproved metadata.
-- Preserve correct orientation, color appearance, and approved rights fields.
+- Remove GPS, keywords, identifying filenames, camera/lens serial numbers, and
+  other unapproved metadata.
+- Preserve correct orientation, color appearance, approved rights fields, and
+  the explicitly approved camera/exposure fields. Do not retain whole EXIF blocks
+  or manufacturer MakerNotes merely to preserve those fields.
 - Prefer metadata-only operations that do not re-encode JPEG pixels.
 - Apply the same policy to download sources, not only display variants.
 - Do not remove provenance/Content Credentials casually; if encountered,
   explicitly evaluate handling rather than assuming all metadata is disposable.
 
-The final site-wide credit, usage terms, and contact details require approval
-before public launch, but do not block implementation.
+### Site-wide credit, usage, and contact defaults
+
+- Default photographer credit: **Adam Kocoloski**, discoverable in the viewer's
+  details or near the download action. Explicit embedded credits take precedence.
+- Public contact for questions, removal requests, and additional permissions:
+  **photos@kocolosk.net**, linked with `mailto:`. The alias is expected to be
+  operational; confirm mail receipt before launch, without assuming DNS or email
+  configuration changes are needed.
+- Players, families, and team/club accounts may download and repost photos,
+  including ordinary team/club promotional social posts. Attribution is
+  appreciated, not required. Cropping and resizing for sharing are allowed.
+- Standing permission covers editorial reporting on the pictured match, team,
+  or players, including by commercial publications. Editorial use requires
+  **Adam Kocoloski** credit and a gallery link where practical. Cropping and
+  resizing are allowed; misleading edits and implied endorsement are not.
+- Paid advertising, merchandise, resale, and stock redistribution require
+  separate permission through the contact address above.
+
+These are approved default usage terms, not permissions inferred from copyright.
+Final presentation of the public wording and the default copyright notice remain
+launch details; explicit embedded rights values still take precedence.
 
 ## 6. Video
 
@@ -227,9 +274,36 @@ Required behavior:
   updates without publishing broken items.
 - Keep credentials outside committed files and avoid logging secrets.
 
-Authentication is required for publishing and preview, but not viewing.
-The authentication mechanism and local tool dependencies remain technical
-implementation choices. No requirement for a browser admin UI.
+### Filename-facing identity and replacement
+
+- Export filenames are the publisher's primary identifiers within a selected
+  album. Internal stable media IDs are bookkeeping, not normally user-managed.
+- Maintain an album-scoped filename → stable media ID mapping independent of the
+  export folder's absolute path; allow reuse of that mapping from another folder.
+- Detect unchanged inputs by content so repeat imports are no-ops. Changed
+  content under a mapped filename is a replacement candidate requiring an
+  explicit action, not an automatic replacement or duplicate import.
+- A renamed export requires an explicit previous-filename/existing-item target
+  for replacement. Missing or ambiguous mappings must not trigger guessed
+  replacements based only on filenames or timestamps.
+- Stable public media links use internal identity, not original filenames.
+  Replacement changes the asset version, not the media-page identity.
+
+### Publisher authentication and preview
+
+- Cloudflare Access protects dedicated publisher and draft-preview routes.
+- The CLI uses a service token stored outside the repository.
+- Browser preview initially allows only the publisher's GitHub identity; verify
+  the GitHub-backed sign-in integration and restrict it to the specific account,
+  not all GitHub users.
+- The Worker validates Access tokens and the intended audience rather than
+  trusting spoofable identity headers.
+- Public and unlisted viewing never requires sign-in. No browser admin UI,
+  publisher invitations, or role-management workflow is required.
+
+Exact Access policy configuration, account identifiers, and credential storage
+details remain implementation work. This design does not itself authorize remote
+Access configuration or credential issuance.
 
 ## 8. Architecture
 
@@ -260,8 +334,28 @@ implementation choices. No requirement for a browser admin UI.
 ### Cloudflare image transformations
 
 - Produces approved display sizes from R2 sources and posters.
-- Input-size limits and cache behavior must be validated for the chosen API.
+- Use the Images binding to transform streams from private R2 without exposing
+  public source URLs.
+- Input-size limits and cache behavior must be validated in production. Follow
+  the conservative preflight ceiling of no more than 20,000,000 sanitized input
+  bytes and dimension checks described in `docs/cloudflare.md`.
+- Verify managed transformation success before first publication; binding
+  deployment and local simulation alone do not validate real inputs.
 - No hosted Images storage is required.
+
+### Deployment
+
+- Automatically deploy `main` after a PR lands, gated on successful checks for
+  the merged commit. A separate manual release is not the intended workflow.
+- Apply forward-only D1 migrations before deploying the Worker and stop on
+  failure. Migrations must remain compatible with the currently running Worker
+  during that sequence.
+- Keep deployment credentials separate from gallery-publishing credentials.
+- Application deployment does not publish draft albums; publication remains an
+  explicit publisher action.
+- Workflow implementation, least-privilege secrets, and branch protections remain
+  setup work. This policy does not itself authorize provisioning credentials,
+  changing repository settings, or deploying a particular change.
 
 ### Local tooling
 
@@ -357,12 +451,28 @@ Hosting domain confirmed on 2026-10-22: **`photos.kocolosk.net`**.
 
 Remaining choices:
 
-- Site name, visual design, and exact route/CLI syntax.
-- Final photographer credit, rights text, and contact details (launch gate).
-- Metadata conflict precedence and timezone fallback details.
+- Detailed visual styling and exact route/CLI syntax and manifest format.
+- Field-specific metadata conflict precedence.
 - Exact image quality settings and video warning thresholds.
-- How stable media identity is mapped during explicit source replacement.
-- Publisher authentication, preview mechanism, and deployment tooling.
-- Final image transformation API and its verified input limits.
+- Whether compatible but unusually large video may always proceed after a
+  warning remains a proposed policy, not a confirmed requirement.
+- Access integration/policy details, specific GitHub account identification, and
+  secure CLI credential storage.
+- Automatic deployment workflow details, migration failure/recovery handling,
+  least-privilege credentials, and repository protections.
+- Final public wording/layout of the approved credit and usage defaults, and a
+  default copyright notice (launch details).
+
+Remaining validation and launch gates:
+
+- Verify Images binding limits and behavior with approved non-private fixtures,
+  including large inputs, orientation, color, and transformation failures.
+- Validate authenticated preview, token/audience enforcement, sanitization,
+  publication/visibility boundaries, and real browser photo/video behavior.
+- Confirm receipt at `photos@kocolosk.net`.
+
+No public site name is needed to proceed. Credit/contact and usage policy,
+timezone fallback, filename-facing stable identity, authentication direction,
+and automatic deployment policy are settled in the sections above.
 
 These are implementation or launch decisions, not reasons to expand v1 scope.
